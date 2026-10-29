@@ -45,7 +45,7 @@
     ],
     "SubagentStart": [
       {
-        "matcher": "change-verifier",
+        "matcher": ".*change-verifier$",
         "hooks": [
           { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/verifier-hooks.sh\" start" }
         ]
@@ -53,7 +53,7 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "change-verifier",
+        "matcher": ".*change-verifier$",
         "hooks": [
           { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/verifier-hooks.sh\" stop" }
         ]
