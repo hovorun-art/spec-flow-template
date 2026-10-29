@@ -51,7 +51,10 @@ for any reason, remove the lock before replying.
 5. Tests (the project works test first): every scenario must have a test that sets up its WHEN
    and asserts its THEN; name the test for each scenario. A scenario without one is a gap, and so is
    a test that would still pass with the implementation removed or returning a wrong result.
-6. Edge cases: for each requirement, name the obvious boundary inputs (empty,
+6. UI: if `ui.md` exists, check that the components and values it lists are in the code and that the
+   states decided in `decisions.md` are implemented. The visual match itself is checked by the
+   `ui-from-screenshots` skill; note here whether that comparison was reported.
+7. Edge cases: for each requirement, name the obvious boundary inputs (empty,
    single element, max constraints, carry/overflow, null) and say whether they
    are covered by code or tests.
 

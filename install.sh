@@ -5,6 +5,9 @@
 # never duplicated. Run `openspec init` yourself only if you want to refresh the stock OpenSpec skills:
 # the copies here carry the decisions/AskUserQuestion customisations.
 set -euo pipefail
+for cmd in git python3; do
+  command -v "$cmd" >/dev/null 2>&1 || { echo "error: '$cmd' is required (the hooks use it)" >&2; exit 1; }
+done
 src="$(cd "$(dirname "$0")/template" && pwd)"
 dest="${1:-}"
 force=""
@@ -33,5 +36,7 @@ echo "updated .gitignore"
 
 [ -d "$dest/.git" ] || echo "note: $dest is not a git repository yet (git init); the git rules and parallel worktrees need one."
 command -v openspec >/dev/null 2>&1 || echo "note: install the OpenSpec CLI: npm i -g @fission-ai/openspec"
+command -v claude >/dev/null 2>&1 || echo "note: install Claude Code: https://claude.com/claude-code"
 echo
-echo "Next: fill the TODOs in CLAUDE.md, openspec/config.yaml and docs/concept.md, and set .claude/flow.conf."
+echo "Next: fill the TODOs in CLAUDE.md, openspec/config.yaml, docs/concept.md and .github/workflows/checks.yml,"
+echo "set .claude/flow.conf, then ask Claude to run the roadmap skill."

@@ -10,8 +10,9 @@ context: |
   assumption. Each change has decisions.md ("Decided" = only what the user said or confirmed,
   "Open questions" = everything unclear). Specs, design and tasks are written only after the
   user runs /specs-go; never create .decisions-approved yourself.
-  Research first: for questions about how something real looks or behaves, use the reference-research
-  skill (reference photos and facts, notes in research.md) and build the answer options from it.
+  UI from screenshots: screenshots the user gives live in the change's ui/ folder and are described in
+  ui.md (ui-from-screenshots skill). What a picture clearly shows counts as the user's input; states,
+  sizes and behaviour it does not show are open questions.
   Asking: via the AskUserQuestion tool in batches (up to 4 questions per call, one tab each), with
   prepared options plus "Other"; single select by default, multi select when answers can combine.
   Never ask as a plain-text list in chat.

@@ -30,6 +30,8 @@ Chat with the user and AskUserQuestion questions/options may be in the user's la
   name the test after the scenario so the verifier can trace it.
 - Fix the code, not the test. Change a test only when it contradicts the spec, and then say so.
 - Tests are deterministic: time, randomness and I/O come in through parameters or fakes.
+- With `TDD_STRICT=1` in `.claude/flow.conf`, the `tdd-guard.sh` hook blocks edits to source files until
+  a test file has changed on the branch.
 
 ## Commands
 
@@ -52,18 +54,21 @@ src/...
 
 ## Workflow
 
+0. Roadmap first: at the start of the project (while `docs/roadmap/` still has its TODO), run the
+   `roadmap` skill to turn `docs/concept.md` into milestones (one file each in `docs/roadmap/`) and an
+   ordered list of changes. Take each new change from it, and update it when the concept changes.
+   Statuses are not stored there: they come from `openspec/changes/`, so archiving needs no roadmap edit.
 1. `/opsx:explore` to clarify, then `/opsx:propose "idea"`. Questions come first: the agent writes
    `decisions.md` ("Decided" = only what the user said, "Open questions" = everything else) and asks
    them all. Specs, design and tasks are written only after the user runs `/specs-go <change>`;
    a PreToolUse hook (`gate-specs.sh`) blocks those files until then. Never invent behaviour.
 
-   Research first: before asking how something with a real-world counterpart should look or behave,
-   or when the user shares a reference photo, run the `reference-research` skill: find and look at
-   reference photos and facts, save the notes in the change's `research.md`, and build the answer
-   options from them. Research only shapes the options; only the user's answers become decisions.
+   UI from screenshots: when the user shares a screenshot or mockup, run the `ui-from-screenshots`
+   skill: save it in the change's `ui/`, inventory it in `ui.md`, ask about everything the picture does
+   not show, and compare the built screen with it by screenshot.
 
    No numbers in specs: tunable values (speeds, timings, limits, sizes) live in config; they may be
-   recorded in `decisions.md`, `design.md`, `tasks.md` and `research.md`, while specs say "the
+   recorded in `decisions.md`, `design.md`, `tasks.md` and `ui.md`, while specs say "the
    configured ...". Fixed facts that are not tuned may stay.
 
    How to ask: through the AskUserQuestion tool, never as a plain-text list in chat. Batch the questions:
@@ -85,6 +90,11 @@ src/...
    considered done. Run it in the foreground (not `run_in_background`) and wait for it; while it works
    it holds `.verify-running`, and the Stop hook waits instead of counting rounds.
 4. `/opsx:archive` after PASS.
+
+Small fixes: a bug fix or change that adds no new behaviour may skip OpenSpec. It still gets its own
+branch (`fix/<name>`), a test that reproduces the bug and fails first, then the fix and green checks.
+If it turns out to change what the user sees, stop and start a change instead. When it is unclear
+which path fits, ask the user.
 
 Tasks in `tasks.md` are grouped as `## N. Title`; check off only your own group's boxes.
 
