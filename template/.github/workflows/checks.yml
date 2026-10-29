@@ -16,8 +16,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # The English-only check comes from the spec-flow plugin repo, pinned to a release tag.
+      - uses: actions/checkout@v4
+        with:
+          repository: hovorun-art/spec-flow-template
+          ref: v2.0.0
+          path: .spec-flow
+      - run: mv .spec-flow "$RUNNER_TEMP/spec-flow" && "$RUNNER_TEMP/spec-flow/plugin/scripts/check-language.sh"
       - run: npm ci
-      - run: .claude/hooks/check-language.sh
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test

@@ -1,0 +1,12 @@
+{
+  "name": "spec-flow",
+  "description": "Spec-driven development flow for Claude Code + OpenSpec",
+  "owner": { "name": "Hovorun Art" },
+  "plugins": [
+    {
+      "name": "spec-flow",
+      "source": "./plugin",
+      "description": "Decisions before specs, test first, hooks and an independent verifier"
+    }
+  ]
+}

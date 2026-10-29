@@ -1,44 +1,15 @@
-schema: spec-driven
+schema: spec-flow
 
+# Project facts for every artifact. The flow's own rules (decisions, approval, test first, task groups)
+# live in openspec/schemas/spec-flow/schema.yaml and CLAUDE.md; keep only what is specific to this product.
 context: |
   TODO: what the product is, the stack (language, framework, test runner, linter), and the main
   architectural rule (for example: logic is pure and separate from UI so it is unit-testable).
   Specs describe user-visible behaviour and edge cases, not implementation.
-  Language: English only in specs, design, tasks, code, comments, identifiers, commit messages
-  and docs. Other languages are allowed only in dedicated translation files (e.g. locales/).
-  Process: never invent behaviour. Anything not stated by the user is a question, not an
-  assumption. Each change has decisions.md ("Decided" = only what the user said or confirmed,
-  "Open questions" = everything unclear). Specs, design and tasks are written only after the
-  user runs /specs-go; never create .decisions-approved yourself.
-  UI from screenshots: screenshots the user gives live in the change's ui/ folder and are described in
-  ui.md (ui-from-screenshots skill). What a picture clearly shows counts as the user's input; states,
-  sizes and behaviour it does not show are open questions.
-  Asking: via the AskUserQuestion tool in batches (up to 4 questions per call, one tab each), with
-  prepared options plus "Other"; single select by default, multi select when answers can combine.
-  Never ask as a plain-text list in chat.
-  Testing: test first. Every scenario (WHEN/THEN) gets a test that is written and seen failing
-  before the code that makes it pass.
+  Language: English only in all artifacts; other languages only in translation files (e.g. locales/).
   Checks: the CHECK_CMDS in .claude/flow.conf.
 
-rules:
-  proposal:
-    - 'Do not decide behaviour for the user; put unclear points into decisions.md as open questions and ask them first with the AskUserQuestion tool in batches of up to 4 (prepared options plus Other)'
-    - 'Write in English only; no other language outside dedicated translation files (e.g. locales/)'
-  specs:
-    - 'Every requirement must trace to a line in decisions.md "Decided"; if it does not, stop and ask instead of assuming'
-    - 'Do not add requirements, numeric values or outcomes the user did not state; unknown values are open questions'
-    - 'No exact tunable numbers in requirements: say "the configured ..."; the values live in config and may be recorded in decisions.md, design.md and tasks.md'
-    - 'Every scenario has an observable THEN that a test can assert'
-    - 'Write in English only; no other language outside dedicated translation files (e.g. locales/)'
-  design:
-    - 'Write in English only; no other language outside dedicated translation files (e.g. locales/)'
-  tasks:
-    - 'Write in English only; no other language outside dedicated translation files (e.g. locales/)'
-    - 'Group tasks under numbered headings ("## 1. Title")'
-    - 'Start tasks.md with a short "Plan" section: the dependency graph and which groups could run in parallel (or "none"). Whether they actually run in parallel is the user''s decision'
-    - 'Test first: in each group, the task that writes the failing test for a scenario comes before the task that implements it'
-    - 'Every group lists "Owns:" (the only files it may create or edit), "Depends on:" and "Parallel with:"'
-    - 'No file may be owned by two groups. Shared files (entry point, config, locale files) belong to group 1 or to the final integration group only'
-    - 'Put shared foundations (types, interfaces, contracts between modules, shared helpers) in group 1 so other groups can start after it merges'
-    - 'Derive the groups from the module boundaries and contracts in design.md; a group that needs another group''s unfinished code must depend on it'
-    - 'End with an integration group that is not parallel and runs the full checks'
+# Per-artifact rules for this project (proposal, decisions, specs, design, tasks), for example:
+# rules:
+#   specs:
+#     - 'Every API error scenario names the HTTP status'

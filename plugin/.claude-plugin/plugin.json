@@ -1,0 +1,9 @@
+{
+  "name": "spec-flow",
+  "version": "2.0.0",
+  "description": "Spec-driven flow for Claude Code + OpenSpec: decisions from the user, specs gated until approved, test first, and an independent verifier enforced by hooks.",
+  "author": { "name": "Hovorun Art" },
+  "repository": "https://github.com/hovorun-art/spec-flow-template",
+  "license": "MIT",
+  "keywords": ["openspec", "spec-driven", "tdd", "hooks", "workflow"]
+}

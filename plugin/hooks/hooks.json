@@ -1,0 +1,70 @@
+{
+  "description": "spec-flow: approval gate, protected state files, git guard, test first, lint, English only, checks and verifier on Stop",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/approve.sh\" --prompt" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-git.sh\"" }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/gate-files.sh\"" }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/tdd-guard.sh\"" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/lint-file.sh\"" },
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/check-language.sh\" --post" }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/approve.sh\" --answer" }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "change-verifier",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/verifier-hooks.sh\" start" }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "change-verifier",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/verifier-hooks.sh\" stop" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/stop-checks.sh\"", "timeout": 900 }
+        ]
+      }
+    ]
+  }
+}

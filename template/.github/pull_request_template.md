@@ -9,7 +9,7 @@ Roadmap item: <`docs/roadmap/NN-<milestone>.md`, or "none">
 
 ## Checklist
 
-- [ ] Every requirement traces to "Decided" in `decisions.md`
+- [ ] Every requirement traces to "Decided" in `decisions.md` (nothing left under Assumed or Open questions)
 - [ ] Tests were written first; every scenario has a test
 - [ ] Checks pass (`CHECK_CMDS` in `.claude/flow.conf`)
 - [ ] `change-verifier` returned PASS (paste the verdict below)

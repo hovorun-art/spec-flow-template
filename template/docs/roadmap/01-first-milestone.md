@@ -1,6 +1,6 @@
 # Milestone 1: <user-visible outcome>
 
-<!-- TODO: written by the `roadmap` skill from docs/concept.md at the start of the project.
+<!-- TODO: written by the `spec-flow:roadmap` skill from docs/concept.md at the start of the project.
      One file per milestone; the number prefix sets the order. Scope and order only: behaviour is
      decided inside each change (decisions.md). No statuses here: they come from openspec/changes/. -->
 
