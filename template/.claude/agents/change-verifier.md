@@ -17,15 +17,6 @@ The change name (directory under `openspec/changes/`). If none is given, list
 `openspec/changes/` (excluding `archive/`); if exactly one is active use it,
 otherwise ask which one.
 
-## Scope (parallel work)
-
-If `openspec/changes/<name>/.scope` exists, or the caller names a task group,
-verify only that group (the `## <N>.` section of `tasks.md`) and only the spec
-requirements those tasks cover. Other groups are being built in parallel in
-other worktrees: do not report their unchecked tasks or missing code as gaps.
-Still flag if the group's code contradicts the spec or touches files outside its
-declared area. Without a scope, verify the whole change.
-
 ## Traceability
 
 Each requirement in the delta specs must trace to a line under "Decided" in
@@ -57,7 +48,10 @@ for any reason, remove the lock before replying.
    - specified but missing or only partly done
    - implemented but not in the spec (scope creep)
    - checked in `tasks.md` but not actually done, or the reverse
-5. Edge cases: for each requirement, name the obvious boundary inputs (empty,
+5. Tests (the project works test first): every scenario must have a test that sets up its WHEN
+   and asserts its THEN; name the test for each scenario. A scenario without one is a gap, and so is
+   a test that would still pass with the implementation removed or returning a wrong result.
+6. Edge cases: for each requirement, name the obvious boundary inputs (empty,
    single element, max constraints, carry/overflow, null) and say whether they
    are covered by code or tests.
 

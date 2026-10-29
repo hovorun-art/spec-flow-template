@@ -9,7 +9,27 @@ The full concept is in `docs/concept.md` (a source for decisions; each point is 
 English only: specs, design, tasks, code, comments, identifiers, UI strings in code, commit
 messages and docs. Other languages only inside dedicated translation files (e.g. `locales/`);
 text shown to users must come from those files, never be hardcoded in code.
-Chat with the user and AskUserQuestion questions/options in Ukrainian; files stay English.
+Chat with the user and AskUserQuestion questions/options may be in the user's language; files stay English.
+
+## Git
+
+- Never commit, amend, push, merge, rebase or reset without the user's explicit approval. When work
+  is ready to commit, show what will go in and the message; the `guard-git.sh` hook makes Claude Code
+  ask before each such git command. One approval covers one command, not later ones. Never route
+  around the prompt (other tools, `--no-verify`, scripts).
+- New features are built on their own branch, never on the main branch (`MAIN_BRANCH` in
+  `.claude/flow.conf`): one branch per change, named after the change (`<change>`). Before
+  implementing, check the current branch and create or switch to it if needed. Only planning
+  artifacts (`openspec/changes/<change>/`) go on the main branch.
+
+## Testing (TDD)
+
+- Tests come first. For each task: write the test, run it and see it fail for the expected reason,
+  write the least code that makes it pass, then refactor with the tests green.
+- Every spec scenario (WHEN/THEN) has at least one test that sets up its WHEN and asserts its THEN;
+  name the test after the scenario so the verifier can trace it.
+- Fix the code, not the test. Change a test only when it contradicts the spec, and then say so.
+- Tests are deterministic: time, randomness and I/O come in through parameters or fakes.
 
 ## Commands
 
@@ -57,8 +77,9 @@ src/...
    AskUserQuestion instead of telling the user to type them. When the user picks one, run it yourself
    (slash commands through the Skill tool); the user's pick counts as running the command, including
    `/specs-go`.
-2. Commit the specs, then implement with `/opsx:apply`. For parallel work use one git worktree per
-   task group: `claude --worktree <change>-<N>`, then `/work-on <change> <N>`.
+2. Commit the specs on the main branch (with the user's approval), then switch to the change's own
+   branch and implement with `/opsx:apply`, test first. Sequential by default; parallel only if the
+   user chooses it (see "Parallel work").
 3. Hooks enforce the loop (see `.claude/hooks/`, settings in `.claude/flow.conf`): lint on each edit,
    full checks at the end, then the `change-verifier` subagent must return PASS before the work is
    considered done. Run it in the foreground (not `run_in_background`) and wait for it; while it works
@@ -76,21 +97,22 @@ Tasks in `tasks.md` are grouped as `## N. Title`; check off only your own group'
 - `change-verifier`: Opus (set in its frontmatter). A false PASS costs more than the extra tokens.
 - Choose by measured cost per task, not by price per token.
 
-## Parallel agents
+## Parallel work
 
-Plan changes in the main chat (decisions, `/specs-go`, specs, design, tasks), commit them on the main
-branch (`MAIN_BRANCH` in `.claude/flow.conf`), then build them in parallel in git worktrees, one agent
-per change. The scripts in `scripts/agents/` work for any set of changes: a change takes part when it is
-active on the main branch, has `tasks.md` and was approved with `/specs-go` (`.decisions-approved`).
+Sequential is the default: one agent builds the groups of a change in order, on the change branch.
+Whether to run groups in parallel is the user's decision, never Claude's.
 
-- `scripts/agents/start-agent.sh <change>`: creates or fast-forwards `../<repo>-<change>`, installs
-  dependencies and starts `claude "/opsx:apply <change>"` (`CLAUDE_FLAGS` adds flags; one agent per
-  worktree, with a confirmation when the worktree already has uncommitted changes).
-- `scripts/agents/status.sh`: progress, verdict, position against the main branch, running agents.
-- `scripts/agents/merge-all.sh`: merges the finished branches in order, then runs all checks.
-- `scripts/agents/gen-tasks.sh`: regenerates `.vscode/tasks.json` (one task per change, "Agents: start all",
-  status, merge). Run it after planning new changes.
-- Merge order: a change lists the changes it must be merged after in `openspec/changes/<name>/.merge-after`
-  (for example a change that edits the entry point lists the others); the rest is ordered by name.
-- Rule for parallel changes: each owns its folders (see "Owns" in its `tasks.md`), adds new capabilities
-  and does not edit shared files.
+- When the "Plan" in `tasks.md` shows groups that could run at the same time, ask with AskUserQuestion
+  before implementing: sequential (recommended unless the groups are large and clearly independent)
+  or parallel, and which groups. Without an explicit "parallel" answer, work sequentially.
+- Parallel runs in waves. Worktrees start from the last commit, so the groups a wave depends on are
+  built first in the main checkout and committed (with approval). Then start one subagent per group of
+  the wave, all in one message, with the Agent tool and `isolation: "worktree"`; each follows
+  `.claude/commands/work-on.md` for its group.
+- Subagents do not commit. When they finish, bring each worktree's changes into the change branch
+  (`git -C <worktree> add -A && git -C <worktree> diff --cached --binary | git apply --index`) and
+  remove the worktree. On a conflict, stop and tell the user: two groups touching one file means the
+  plan was wrong.
+- After the last wave: the integration group, the full checks, then `change-verifier` on the whole change.
+- Groups own disjoint files ("Owns" in `tasks.md`). Shared files (entry point, config, locale files)
+  belong to group 1 or to the integration group.

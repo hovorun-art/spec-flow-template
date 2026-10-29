@@ -2,9 +2,6 @@
 # Stop hook: keeps the main agent working until the change-verifier subagent has
 # returned PASS for an OpenSpec change whose tasks are all checked off.
 #
-# Parallel work: if openspec/changes/<name>/.scope exists (gitignored, written by
-# /work-on in a worktree), only tasks under the "## <scope>." heading of tasks.md count.
-#
 # Verdict lives in openspec/changes/<name>/.verdict (written by the verifier).
 # It counts only if it is newer than tasks.md and every project file outside
 # openspec/, .claude/, .git/ and IGNORED_DIRS (and .gitignore), so any later edit forces a re-check.
@@ -24,15 +21,9 @@ for dir in openspec/changes/*/; do
   verdict="$dir/.verdict"
   attempts="$dir/.verify-attempts"
   [ -f "$tasks" ] || continue
-  scope=$(cat "$dir/.scope" 2>/dev/null)
-  if [ -n "$scope" ]; then
-    body=$(awk -v s="$scope" '/^## /{on=($0 ~ "^## " s "[. ]")} on' "$tasks")
-  else
-    body=$(cat "$tasks")
-  fi
+  body=$(cat "$tasks")
   echo "$body" | grep -q '^[[:space:]]*- \[ \]' && continue    # tasks unfinished
   echo "$body" | grep -qi '^[[:space:]]*- \[x\]' || continue   # nothing done
-  [ -n "$scope" ] && scope_note=" (scope: group $scope only)" || scope_note=""
 
   if [ -f "$verdict" ] && [ "$(head -n1 "$verdict")" = "PASS" ] && [ ! "$tasks" -nt "$verdict" ]; then
     # shellcheck disable=SC2086
@@ -61,8 +52,8 @@ for dir in openspec/changes/*/; do
 
   last=""
   [ -f "$verdict" ] && last=" Previous verdict: $(tr '\n' ' ' < "$verdict")"
-  printf '{"decision":"block","reason":"OpenSpec change \\"%s\\" has all tasks checked%s but has no up-to-date PASS verdict (round %s of %s).%s Run the change-verifier subagent on this change%s, in the FOREGROUND (run_in_background false) and wait for its result before you answer. If it does not return PASS, fix every gap it lists in the code, then run change-verifier again. Do not finish until it returns PASS, or explain to the user why a gap cannot be closed."}\n' \
-    "$name" "$scope_note" "$((n + 1))" "$MAX_ROUNDS" "$last" "$scope_note"
+  printf '{"decision":"block","reason":"OpenSpec change \\"%s\\" has all tasks checked but has no up-to-date PASS verdict (round %s of %s).%s Run the change-verifier subagent on this change, in the FOREGROUND (run_in_background false) and wait for its result before you answer. If it does not return PASS, fix every gap it lists in the code, then run change-verifier again. Do not finish until it returns PASS, or explain to the user why a gap cannot be closed."}\n' \
+    "$name" "$((n + 1))" "$MAX_ROUNDS" "$last"
   exit 0
 done
 exit 0

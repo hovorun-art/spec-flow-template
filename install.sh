@@ -31,7 +31,7 @@ while IFS= read -r line; do
 done < gitignore.flow
 echo "updated .gitignore"
 
-[ -d "$dest/.git" ] || echo "note: $dest is not a git repository yet (git init); the agent scripts need one."
+[ -d "$dest/.git" ] || echo "note: $dest is not a git repository yet (git init); the git rules and parallel worktrees need one."
 command -v openspec >/dev/null 2>&1 || echo "note: install the OpenSpec CLI: npm i -g @fission-ai/openspec"
 echo
 echo "Next: fill the TODOs in CLAUDE.md, openspec/config.yaml and docs/concept.md, and set .claude/flow.conf."

@@ -1,12 +1,13 @@
 ---
-description: Work on one task group of an OpenSpec change (for parallel chats in separate worktrees)
+description: Build one task group of an OpenSpec change in an isolated worktree (followed by parallel subagents)
 argument-hint: <change-name> <group-number>
 ---
 
 Arguments: `$ARGUMENTS` = `<change-name> <group-number>`.
 
-1. Read `openspec/changes/<change-name>/` (proposal, design, specs, tasks). If `tasks.md` has no numbered `## N.` groups, stop and tell the user to regroup it first (e.g. with /opsx:update).
-2. Make sure this is a separate git worktree on its own branch, not the main checkout (`git rev-parse --git-common-dir` differs from `--git-dir`). If it is not, stop and tell the user to start one with `claude --worktree <change-name>-<group-number>` so parallel chats do not overwrite each other.
-3. Write the group number to `openspec/changes/<change-name>/.scope` (file is gitignored, local to this worktree).
-4. Implement only the tasks under group `<group-number>`, following the existing OpenSpec apply workflow. Do not touch other groups' tasks or checkboxes, and stay inside the files the group declares. If you need something owned by another group, stop and report it instead of building it.
-5. When the group is done, the Stop hook will require the change-verifier subagent to return PASS for this group. After PASS, commit on this branch and tell the user it is ready to merge.
+1. Read `openspec/changes/<change-name>/` (proposal, design, specs, tasks). If `tasks.md` has no numbered `## N.` groups, stop and report it.
+2. Make sure this is a separate git worktree, not the main checkout (`git rev-parse --git-common-dir` differs from `--git-dir`). If it is not, stop and report it: parallel groups must never share a checkout.
+3. If the worktree has no dependencies yet, run `INSTALL_CMD` from `.claude/flow.conf` (skip it when `DEPS_DIR` already exists).
+4. Implement only the tasks under group `<group-number>`, test first (see "Testing (TDD)" in `CLAUDE.md`). Do not touch other groups' tasks or checkboxes, and stay inside the files the group lists under "Owns". If you need something owned by another group, stop and report it instead of building it.
+5. Run the checks (`CHECK_CMDS` in `.claude/flow.conf`) until they pass. Do not commit and do not run change-verifier: the main agent brings the groups together and verifies the whole change.
+6. Report: the worktree path, the files you changed, the tasks you checked off, the check results, and anything left open.
