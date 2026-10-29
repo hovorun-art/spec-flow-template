@@ -5,11 +5,12 @@
 #   --answer : PostToolUse on AskUserQuestion, the user picked an option whose label starts with
 #              "Approve decisions" in a question that names the change
 # The marker is created only when decisions.md has no unchecked item ("- [ ]") left in Assumed or Open
-# questions; otherwise the agent is told what is still unresolved.
+# questions; otherwise the agent is told what is still unresolved. It records the sha256 of decisions.md,
+# so gate-files.sh treats a later edit of decisions.md as unapproved.
 mode="$1"
 input=$(cat)
 MODE="$mode" INPUT="$input" python3 - <<'PY'
-import datetime, json, os, re, sys
+import datetime, hashlib, json, os, re, sys
 
 mode = os.environ['MODE']
 d = json.loads(os.environ.get('INPUT') or '{}')
@@ -34,8 +35,9 @@ def approve(name, source):
                 f"decisions.md are still unchecked (Assumed or Open questions):\n{listing}\n"
                 "Resolve them with the user (AskUserQuestion), record the answers, then offer approval again.")
     stamp = datetime.datetime.now().astimezone().isoformat(timespec='seconds')
+    digest = hashlib.sha256(open(decisions, 'rb').read()).hexdigest()
     with open(os.path.join(folder, '.decisions-approved'), 'w', encoding='utf-8') as f:
-        f.write(f"approved: {stamp}\nsource: {source}\n")
+        f.write(f"approved: {stamp}\nsource: {source}\nsha256: {digest}\n")
     return (f"spec-flow: the user approved the decisions for '{name}'. Specs, design and tasks may now be "
             "written (continue with the spec-flow:specs-go workflow).")
 

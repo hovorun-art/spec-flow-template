@@ -1,14 +1,15 @@
 #!/bin/bash
 # PreToolUse hook (Write|Edit|MultiEdit|NotebookEdit|Bash): guards the files the flow relies on.
 # - specs/, design.md and tasks.md of a change are blocked until the user has approved its decisions
-#   (openspec/changes/<name>/.decisions-approved, which only approve.sh creates).
+#   (openspec/changes/<name>/.decisions-approved, which only approve.sh creates). The marker holds the
+#   sha256 of decisions.md at approval, so any later edit of decisions.md needs a new approval.
 # - The state files are never written by an agent, only by the hooks: .decisions-approved (approve.sh),
 #   .verdict and .verify-running (verifier-hooks.sh), .verify-attempts (verify-change.sh).
 # Bash commands are checked by their text: one that names a guarded path and writes (redirect, tee, cp,
 # mv, touch, rm, sed -i, an interpreter...) is denied. Reading those files stays allowed.
 input=$(cat)
 INPUT="$input" python3 - <<'PY'
-import json, os, re, sys
+import hashlib, json, os, re, sys
 
 d = json.loads(os.environ.get('INPUT') or '{}')
 tool = d.get('tool_name', '')
@@ -31,13 +32,26 @@ def deny(reason):
 
 def approved(prefix, name):
     root = prefix if os.path.isabs(prefix) else os.path.join(cwd, prefix)
-    return os.path.isfile(os.path.join(root, 'openspec', 'changes', name, '.decisions-approved'))
+    folder = os.path.join(root, 'openspec', 'changes', name)
+    try:
+        marker = open(os.path.join(folder, '.decisions-approved'), encoding='utf-8').read()
+    except OSError:
+        return False
+    m = re.search(r'^sha256: ([0-9a-f]{64})$', marker, re.M)
+    if not m:
+        return True  # marker written before approvals recorded a hash
+    try:
+        return hashlib.sha256(open(os.path.join(folder, 'decisions.md'), 'rb').read()).hexdigest() == m.group(1)
+    except OSError:
+        return False
 
 
 def gate_reason(name):
     return (
-        f"Blocked: the decisions for change '{name}' are not approved yet, so its specs, design and tasks "
-        "may not be written. Instead: 1. Write or update openspec/changes/{0}/decisions.md (Decided = only "
+        f"Blocked: the decisions for change '{name}' are not approved, or decisions.md changed after the "
+        "user approved it, so its specs, design and tasks may not be written. "
+    ) + (
+        "Instead: 1. Write or update openspec/changes/{0}/decisions.md (Decided = only "
         "what the user said; Assumed = minor defaults you propose, each with a reason; Open questions = "
         "everything else). 2. Ask the open questions with AskUserQuestion (see \"Asking\" in CLAUDE.md) and "
         "record the answers. 3. Have the user approve: they run /spec-flow:specs-go {0}, or pick \"Approve "
@@ -50,7 +64,8 @@ STATE_REASON = ("Blocked: this is a state file owned by the spec-flow hooks (.de
 
 if tool == 'Bash':
     cmd = ti.get('command', '')
-    if not WRITES.search(cmd):
+    # Redirects that write nothing (2>/dev/null, 2>&1) are not writes.
+    if not WRITES.search(re.sub(r'\d*>>?\s*/dev/null\b|\d*>&\d*-?', ' ', cmd)):
         sys.exit(0)
     if STATE.search(cmd) and not re.match(r'\s*git\s+(add|status|diff|log|show)\b', cmd):
         deny(STATE_REASON)
