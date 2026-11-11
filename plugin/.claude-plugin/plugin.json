@@ -1,6 +1,6 @@
 {
   "name": "spec-flow",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Spec-driven flow for Claude Code + OpenSpec (TypeScript, React + Node): work on its own branch or worktree, decisions from the user, specs gated until approved, test first, and an independent verifier enforced by hooks.",
   "author": { "name": "Hovorun Art" },
   "repository": "https://github.com/hovorun-art/spec-flow-template",
