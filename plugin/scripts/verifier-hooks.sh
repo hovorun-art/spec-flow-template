@@ -1,6 +1,6 @@
 #!/bin/bash
 # SubagentStart / SubagentStop hooks for the change-verifier subagent.
-#   start : create .claude/.verify-running, so the Stop hook waits instead of counting rounds
+#   start : create .claude/.verify-running, a lock that marks a verifier run in progress
 #   handback: (PreToolUse of SubagentHandback) record the verdict from the report a background
 #           verifier hands back. At its SubagentStop there is no final message and the report is
 #           not in its transcript yet, so this is the only point where a background run's verdict
@@ -13,10 +13,13 @@
 #   VERDICT: PASS | PARTIAL | FAIL
 #   GAPS:
 #   - <gap>
+# The .verdict file: the verdict word, then `commit: <HEAD at the verdict>` (when the project is a git
+# repository), then one `- <gap>` line per gap. The verifier's next run checks only those gaps and the
+# diff since that commit; archive needs a PASS whose commit is the current HEAD.
 mode="$1"
 input=$(cat)
 MODE="$mode" INPUT="$input" python3 - <<'PY'
-import json, os, re, sys
+import json, os, re, subprocess, sys
 
 mode = os.environ['MODE']
 d = json.loads(os.environ.get('INPUT') or '{}')
@@ -100,7 +103,13 @@ tail = message.split('GAPS:', 1)[1] if 'GAPS:' in message else ''
 for line in tail.splitlines():
     if re.match(r'\s*[-*] ', line):
         gaps.append(line.strip())
+try:
+    head = subprocess.run(['git', '-C', root, 'rev-parse', 'HEAD'], capture_output=True, text=True, timeout=5)
+    commit = head.stdout.strip() if head.returncode == 0 else ''
+except Exception:
+    commit = ''
 with open(os.path.join(folder, '.verdict'), 'w', encoding='utf-8') as f:
-    f.write(verdict[-1] + '\n' + ''.join(g + '\n' for g in gaps if verdict[-1] != 'PASS'))
+    f.write(verdict[-1] + '\n' + (f'commit: {commit}\n' if commit else '')
+            + ''.join(g + '\n' for g in gaps if verdict[-1] != 'PASS'))
 PY
 exit 0

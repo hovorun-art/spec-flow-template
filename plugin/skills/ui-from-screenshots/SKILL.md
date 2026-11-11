@@ -27,13 +27,13 @@ check the result against the picture instead of trusting the code.
    - visual values: colours (hex), font sizes and weights, spacing, radii, borders, shadows, icon set;
    - mark each item "seen" (clearly in the picture) or "estimated" (measured or guessed from pixels).
 
-3. **Map to the code.** Find the project's existing components, tokens and styles (see Architecture in
-   `CLAUDE.md`). For each item, note whether it reuses something, extends it or is new. Prefer the
+3. **Map to the code.** Find the project's existing components, tokens and styles (see
+   `.claude/rules/web.md`). For each item, note whether it reuses something, extends it or is new. Prefer the
    project's tokens over the picture's estimated values when they are close; list the ones that are not.
 
-4. **Ask.** What the picture clearly shows counts as the user's input and goes into "Decided" in
-   `decisions.md` with "(user, screenshot ui/<file>)". Everything else is an open question (or, for a
-   minor detail, an item under "Assumed"), asked with AskUserQuestion (see "Asking" in CLAUDE.md), typically:
+4. **Ask.** What the picture clearly shows counts as the user's input and goes into "Behaviour" in
+   `brief.md` as one line that names the picture ("as in ui/<file>"). Everything else is an item
+   under "To confirm" (a question, or an assumption for a minor detail), asked with AskUserQuestion (see "Asking" in CLAUDE.md), typically:
    - states not shown: hover, focus, disabled, loading, empty, error, long text;
    - other sizes: mobile, tablet, wide; what collapses or wraps;
    - behaviour: what each control does, validation, navigation;
@@ -42,7 +42,7 @@ check the result against the picture instead of trusting the code.
 
 5. **Write it down for the change.** Specs describe the visible behaviour and reference the picture
    ("the login screen matches the layout in ui/login.png"); exact pixel values and colours go into
-   `design.md` or the project's tokens, not into specs. Tasks list components in build order.
+   `ui.md` or the project's tokens, not into specs. Tasks list components in build order.
 
 6. **Build.** Test first where there is behaviour (states, validation, what renders for which data);
    the look itself is checked in step 7.

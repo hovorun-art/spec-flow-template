@@ -61,5 +61,5 @@ echo "To install it yourself (or from this local checkout while developing it):"
 echo "  claude plugin marketplace add hovorun-art/spec-flow-template   # or: $repo"
 echo "  claude plugin install spec-flow@spec-flow"
 echo
-echo "Next: fill the TODOs in CLAUDE.md, openspec/config.yaml, docs/concept.md and .github/workflows/checks.yml,"
+echo "Next: commit the template on the main branch yourself (Claude never edits or commits on it), then fill the TODOs in CLAUDE.md, openspec/config.yaml, docs/concept.md and .github/workflows/checks.yml,"
 echo "set .claude/flow.conf, then ask Claude to run the spec-flow:roadmap skill."

@@ -3,7 +3,10 @@
   "model": "opus",
   "extraKnownMarketplaces": {
     "spec-flow": {
-      "source": { "source": "github", "repo": "hovorun-art/spec-flow-template" }
+      "source": {
+        "source": "github",
+        "repo": "hovorun-art/spec-flow-template"
+      }
     }
   },
   "enabledPlugins": {
@@ -17,15 +20,31 @@
       "Bash(openspec instructions:*)",
       "Bash(openspec context:*)",
       "Bash(openspec validate:*)",
+      "Bash(openspec new change:*)",
+      "Bash(openspec archive:*)",
       "Bash(npm test:*)",
       "Bash(npm run typecheck:*)",
       "Bash(npm run lint:*)",
       "Bash(npm run build:*)",
       "Bash(npm run --silent:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run check)",
+      "Bash(npm run test:e2e)",
+      "Bash(npm run test:e2e --:*)",
+      "Bash(npx vitest related:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(npx tsc:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
-      "Bash(git branch:*)"
+      "Bash(git branch:*)",
+      "Bash(git worktree list:*)",
+      "Bash(git show:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git merge-base:*)",
+      "Bash(git add:*)",
+      "Bash(git switch -c:*)",
+      "Bash(git worktree add:*)"
     ],
     "deny": [
       "Read(./**/.env)",

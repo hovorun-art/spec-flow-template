@@ -7,7 +7,7 @@ description: Build, update or show the project roadmap (docs/roadmap/, one file 
 
 The roadmap turns the concept into an ordered list of changes, so each `/spec-flow:propose` starts from a
 known place instead of from scratch. It decides scope and order only, never behaviour: how each item
-works is decided later, inside its own change, through `decisions.md`.
+works is decided later, inside its own change, through its `brief.md`.
 
 ## Layout
 

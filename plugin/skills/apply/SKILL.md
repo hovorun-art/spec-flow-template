@@ -1,224 +1,67 @@
 ---
 name: apply
-description: Implement tasks from an OpenSpec change. Use when the user wants to start implementing, continue implementation, or work through tasks. Also use when the user says "openspec apply", "spec-flow apply", or "openspec implement".
+description: Implement the tasks of a planned change, one task group at a time, test first. Use when the user wants to start or continue implementing a change, or says "apply".
+argument-hint: <change-name>
 allowed-tools: Bash(openspec:*)
-license: MIT
-compatibility: Requires openspec CLI.
-metadata:
-  author: openspec
-  version: "1.0"
-  generatedBy: "1.14.1"
 ---
 
-Implement tasks from an OpenSpec change.
+Implement change `$ARGUMENTS`. With no name: use the only active change, or ask
+(`openspec list --json`).
 
-**spec-flow additions** (apply on top of the steps below):
-- **Branch**: implement on the change's own branch (`<change>`), never on the main branch (`MAIN_BRANCH` in `.claude/flow.conf`). The planning artifacts are committed on that branch first (no approval needed off the main branch; the hook denies a commit on it). Check the current branch before the first edit and create or switch to it.
-- **Test first**: for each task, write the scenario's test, run it and see it fail for the expected reason, write the least code that passes, then refactor with the tests green (see "Testing" in CLAUDE.md).
-- **Unclear behaviour**: a question about behaviour goes into `decisions.md` under "Open questions" and to the user; never settle it in code.
-- **Parallel or sequential**: if the "Plan" in `tasks.md` shows groups that could run at the same time, ask with AskUserQuestion before implementing: sequential (recommended unless the groups are large and clearly independent) or parallel, and which groups. Without an explicit "parallel" answer, work sequentially. For parallel, follow "Parallel groups" at the end of this skill.
-- **Test review**: whenever a group wrote or changed tests, run the `spec-flow:test-case-reviewer` subagent in the foreground on each test area it touched (each package or app and each test level), giving it only the area, not your reasoning. Add the missing cases it reports, or tell the user why a case belongs elsewhere, before the group counts as done. This applies even if `tasks.md` has no review task for that group.
-- **Running tests**: run only the test files related to the change, not the whole suite, unless there is a reason (see "Testing" in CLAUDE.md). E2e tests run only here in the main agent, never in a subagent: run the e2e files that subagents (`spec-flow:work-on`, `spec-flow:test-case-reviewer`, `spec-flow:change-verifier`) list in their reports.
-- **One commit per group**: when a group is done (boxes checked, test review acted on, checks green), commit it before starting the next group: the files (including `tasks.md` with the group's boxes checked) with a Conventional Commits message for that group, and report the commit (hash, files, message) to the user; no approval is needed on the change branch. Never fold several groups into one commit or split a group across commits. Fixes from `spec-flow:change-verifier` go into their own commit.
-- **Done means verified**: when every task is checked, run the `spec-flow:change-verifier` subagent on the change in the foreground and wait for its verdict; fix every gap it lists and run it again until it returns PASS. The Stop hook enforces this.
+1. **Where.** In the change's own worktree, on its branch. If `git branch --show-current` is the
+   main branch (`MAIN_BRANCH` in `.claude/flow.conf`), stop and run the `spec-flow:start` skill
+   instead of switching branches here.
 
-**Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`, `schemas`, `view`). Once selected, treat `--store <id>` as sticky for the rest of the workflow. Every unscoped example of those commands below is shorthand: before running it, append the flag. For example, run `openspec status --change "<name>" --json --store "<id>"`, not the unscoped form shown below. Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
+2. **Load.** `openspec instructions apply --change "<name>" --json` returns the state, the progress,
+   the task list (each task with its file and line) and `contextFiles`. Read every context file
+   (`brief.md`, the delta specs, `tasks.md`), and the `.claude/rules/` files for the code the tasks
+   touch.
+   - `blocked`: planning is not finished; say what is missing (`/spec-flow:propose <name>`) and stop.
+   - `all_done`: go to step 5.
+   Say in one line where the change stands: "N/M tasks, next: group K".
 
-**Project check:** These steps expect a project that already uses OpenSpec. Before the first step that writes anything (`new change`, `archive`, `sync specs`, or authoring an artifact file), confirm the project has a root: run `openspec list --json` (with `--store <id>` when a store is selected, since the store is then the root) and read `root`. A root object means the project is set up. `"root": null` means it is not - there is no `openspec/` directory here, and a write such as `openspec new change` would create one as a side effect. The command also exits non-zero, which is that answer rather than a broken CLI, so read the JSON instead of retrying or working around it.
+3. **Parallel or sequential.** If `tasks.md` has groups that do not depend on each other
+   ("Depends on"), ask with AskUserQuestion: sequential (recommended unless the groups are large
+   and clearly independent) or parallel, and which groups. Without an explicit "parallel" answer,
+   work sequentially. For parallel, see the end of this skill.
 
-One `"root": null` is not about setup: when a `status` error message starts with `Declared in` or `Invalid store declaration in` and names this project's `openspec/config.yaml` (or `config.yml`), the project does use OpenSpec through a store it declares, which this machine cannot resolve (the store is not registered, or the `store:` line is malformed). Do not treat it as uninitialized and skip the branches below: stop before writing and show the user that error's `message` and `fix`.
+4. **One task group at a time**, following "Testing", "Checks" (steps 1 and 2) and "Git" in
+   CLAUDE.md:
+   - for each task: the test first, see it fail for the expected reason, the least code that
+     passes; then check its box (`- [ ]` → `- [x]`). Check a box only when the task is fully done.
+     Stay inside the files the group lists under "Owns";
+   - when the group's tasks are done: `npm run check`, then the `spec-flow:test-case-reviewer`
+     subagent (Sonnet) on the test files the group wrote or changed; act on its report;
+   - commit the group (one commit, `tasks.md` with its checked boxes included) and report the
+     commit (hash, files, message) before the next group starts.
+   E2e tests run only here, in the main agent.
 
-Otherwise, with no root, what happens next depends on how this workflow was reached:
+   **Stop and ask** instead of deciding in code when:
+   - a behaviour is unclear or the brief does not settle it: add it to "To confirm" in `brief.md`;
+   - the work has to differ from the brief's "Technical" section (another library, a module that
+     could not be reused, a task that needs more than the specs describe).
+   Either way the brief changes, so the user approves it again, and the decision, its reason and
+   what triggered it are appended to `decisions.md`.
 
-- **Auto-selected**: you chose this workflow yourself, without the user naming OpenSpec, naming this skill, or running its slash command. Stop using OpenSpec and answer the request normally, as you would with no OpenSpec installed. Do not ask them to set anything up and do not mention OpenSpec setup.
-- **Explicit OpenSpec request**: the user named OpenSpec, named this skill, or ran its slash command. Stop before writing and ask how to proceed: set this project up (`openspec init`), target a store they already have (`--store <id>`), or continue without OpenSpec for this request. Wait for their answer.
+5. **Done means verified.** When every task is checked and committed, run step 3 of "Checks" in
+   CLAUDE.md, in its order: the Opus test review and `spec-flow:change-verifier` together, fixes
+   (their own commit) until PASS, then `npm run check:full` and `npm run test:e2e` once. No hook
+   runs this for you, and a hook denies the archive without a PASS on the current commit. Show the
+   user the verifier's "Against the brief" list, then offer `/spec-flow:archive <name>`.
 
-In both branches, never create the root as a side effect: do not run `openspec init` until the user asks for it, do not hand-create `openspec/` files, and do not let a command create it.
+Merging is never part of apply: that is `spec-flow:finish`.
 
-**Input**: Optionally specify a change name (e.g., `/spec-flow:apply add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+## Parallel groups (only when the user chose parallel)
 
-**Steps**
-
-1. **Select the change**
-
-   If a name is provided, use it. Otherwise:
-   - Infer from conversation context if the user mentioned a change
-   - Auto-select if only one active change exists
-   - If ambiguous, run `openspec list --json` to get available changes and ask the user to select one
-
-   Always announce: "Using change: <name>" and how to override (e.g., `/spec-flow:apply <other>`).
-
-2. **Check status to understand the schema**
-   ```bash
-   openspec status --change "<name>" --json
-   ```
-   Parse the JSON to understand:
-   - `schemaName`: The workflow being used (e.g., "spec-driven")
-   - `planningHome`, `changeRoot`, and `actionContext`: planning scope and edit constraints
-   - Which artifact contains the tasks (typically "tasks" for spec-driven, check status for others)
-
-3. **Get apply instructions**
-
-   ```bash
-   openspec instructions apply --change "<name>" --json
-   ```
-
-   This returns:
-   - `contextFiles`: artifact ID -> array of concrete file paths (varies by schema - could be proposal/specs/design/tasks or spec/tests/implementation/docs)
-   - Progress (total, complete, remaining)
-   - Task list with status, source path, and source line
-   - Dynamic instruction based on current state
-   - Optional `context`: current required project instruction input from the selected root
-   - Optional `operationGuidance`: current advisory guidance for apply
-   - `missingArtifacts` (when present): required artifact ids with no output
-
-   **Handle states:**
-   - If `state: "blocked"`: show the message and pause implementation.
-     - If `missingArtifacts` is non-empty: suggest completing the missing artifacts. Run `openspec status --change "<name>" --json`, select the next `ready` artifact (not `skipped` or `blocked`), and use `openspec instructions "<artifact-id>" --change "<name>" --json` for its rules and template. Keep the selected `--store <id>` on both commands.
-     - Otherwise, follow the CLI instruction to create or repair the schema-configured tracking file from existing planning artifacts. Do not assume another artifact is ready or start implementation while blocked.
-   - If `state: "all_done"`: report that all tracked tasks are complete and suggest review or verification as appropriate before archiving
-   - Otherwise: proceed to implementation
-
-   Treat `context` as a required prompt-level input. Read and consider it, and
-   apply relevant project facts, conventions, and constraints while implementing.
-   Treat `operationGuidance` as optional additive advice. Read and consider every
-   entry, and follow entries that are applicable and compatible with the built-in
-   workflow.
-
-   Keep both fields separate from CLI-returned state, missing artifacts, tasks,
-   progress, `contextFiles`, and the built-in `instruction`. They are not
-   evidence of task completion, do not replace the built-in instruction, and do
-   not permit bypassing a blocked state. If context conflicts with the built-in
-   instruction, an explicit user choice, or a CLI-controlled value, report the
-   conflict and preserve the controlling value. If guidance is inapplicable or
-   conflicts with those controlling inputs, do not follow it and explain why.
-   These are prompt-level behavior contracts, not enforceable checks.
-
-4. **Read context files**
-
-   Read every file path listed under `contextFiles` from the apply instructions output.
-   The files depend on the schema being used:
-   - **spec-driven**: proposal, specs, design, tasks
-   - Other schemas: follow the contextFiles from CLI output
-
-   Do not copy `context` or `operationGuidance` verbatim into implementation
-   files or planning artifacts unless the user separately asks for that content.
-
-5. **Show current progress**
-
-   Display:
-   - Schema being used
-   - Progress: "N/M tasks complete"
-   - Remaining tasks overview
-   - Dynamic instruction from CLI
-
-6. **Implement tasks (loop until done or blocked)**
-
-   For each pending task:
-   - Show which task is being worked on
-   - Make the code changes required
-   - Keep changes minimal and focused
-   - Before editing, confirm the checkbox at the returned `sourcePath` and `line` still matches the task description; if it does not, rerun the apply instructions and use the refreshed location
-   - Mark the task complete at its returned `sourcePath` and `line`: `- [ ]` → `- [x]`
-   - Rerun the apply instructions and confirm that task is now done and progress changed
-   - Continue to next task
-
-   **Pause if:**
-   - Task is unclear → ask for clarification
-   - Implementation reveals a design issue → suggest updating artifacts
-   - A task needs work beyond what the spec and tasks describe, or you are tempted to drop, narrow, defer, or accept exceptions to specified behavior to make it fit → surface the added scope and ask; do not absorb it silently
-   - Error or blocker encountered → report and wait for guidance
-   - User interrupts
-
-7. **On completion or pause, show status**
-
-   Display:
-   - Tasks completed this session
-   - Overall progress: "N/M tasks complete"
-   - If all done: report that tracked tasks are complete and suggest review or verification as appropriate before archiving
-   - If paused: explain why and wait for guidance
-
-**Output During Implementation**
-
-```
-## Implementing: <change-name> (schema: <schema-name>)
-
-Working on task 3/7: <task description>
-[...implementation happening...]
-✓ Task complete
-
-Working on task 4/7: <task description>
-[...implementation happening...]
-✓ Task complete
-```
-
-**Output On Completion**
-
-```
-## Implementation Complete
-
-**Change:** <change-name>
-**Schema:** <schema-name>
-**Progress:** 7/7 tasks complete ✓
-
-### Completed This Session
-- [x] Task 1
-- [x] Task 2
-...
-
-All tracked tasks are complete. Review or verify the change as appropriate
-before archiving. Run `spec-flow:change-verifier` now; after PASS, archive with `/spec-flow:archive`.
-```
-
-**Output On Pause (Issue Encountered)**
-
-```
-## Implementation Paused
-
-**Change:** <change-name>
-**Schema:** <schema-name>
-**Progress:** 4/7 tasks complete
-
-### Issue Encountered
-<description of the issue>
-
-**Options:**
-1. <option 1>
-2. <option 2>
-3. Other approach
-
-What would you like to do?
-```
-
-**Guardrails**
-- Keep going through tasks until done or blocked
-- Always read context files before starting (from the apply instructions output)
-- If task is ambiguous, pause and ask before implementing
-- If implementation reveals issues, pause and suggest artifact updates
-- Keep code changes minimal and scoped to each task
-- Update task checkbox immediately after completing each task
-- Pause on errors, blockers, or unclear requirements - don't guess
-- When a task needs work beyond what the spec describes, surface the added scope and pause - never silently narrow, defer, or simplify away specified behavior
-- Only mark a task `- [x]` when its specified behavior is fully implemented, not when it is partially done or deferred
-- Use contextFiles from CLI output, don't assume specific file names
-- Use each task's sourcePath and line to update its exact checkbox
-- Do not use context or operation guidance as proof that a task is complete
-- Apply relevant project context; report conflicts with controlling workflow inputs
-- Consider every guidance entry; explain any inapplicable or conflicting advice
-- Do not copy runtime context or operation guidance into implementation files or planning artifacts
-- Preserve CLI-controlled blocked/ready/all-done behavior and completion criteria
-
-**Fluid Workflow Integration**
-
-This skill supports the "actions on a change" model:
-
-- **Can be invoked anytime**: Before all artifacts are done (if tasks exist), after partial implementation, interleaved with other actions
-- **Allows artifact updates**: If implementation reveals design issues, suggest updating artifacts - not phase-locked, work fluidly
-
-**Parallel groups** (only when the user chose parallel)
-
-- Run in waves. Worktrees start from the last commit, so the groups a wave depends on are built first in the main checkout and committed.
-- Start one subagent per group of the wave, all in one message, with the Agent tool and `isolation: "worktree"`; each follows the `spec-flow:work-on` skill for its group (`<change> <group-number>`).
-- Each subagent commits its group in its worktree (one commit, reported with its hash). When they finish, bring each commit onto the change branch with `git cherry-pick <hash>` (allowed by the hook off the main branch), one group at a time, then remove the worktree. On a conflict, stop and tell the user: two groups touching one file means the plan was wrong.
-- Groups own disjoint files ("Owns" in `tasks.md`); check off only your own group's boxes.
-- After the last wave: the integration group, the full checks, then `spec-flow:change-verifier` on the whole change.
+- Run in waves. A group's worktree starts from the change branch's last commit, so the groups a
+  wave depends on are built first, in the change's worktree, and committed.
+- Start one subagent per group of the wave, all in one message, with the Agent tool and
+  `isolation: "worktree"`; each follows the `spec-flow:work-on` skill (`<change> <group-number>`).
+- Each subagent commits its group on a branch of its own (`<change>-g<N>`) and reports the hash.
+  Bring each commit onto the change branch with `git cherry-pick <hash>`, one group at a time,
+  then remove the group's worktree and branch (`git worktree remove <path> && git branch -D
+  <change>-g<N>`; the hook asks for `-D`, since a cherry-picked branch is not merged). On a
+  conflict, stop and tell the user: two groups touching one file means the plan was wrong.
+- After each cherry-pick run the group's test review on the test files its report lists; what the
+  review asks for is one follow-up commit for that group (`test(<scope>): ...`).
+- After the last wave: the group that wires the others together, if there is one, then step 5.

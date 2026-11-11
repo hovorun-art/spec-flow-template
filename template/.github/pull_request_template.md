@@ -9,9 +9,9 @@ Roadmap item: <`docs/roadmap/NN-<milestone>.md`, or "none">
 
 ## Checklist
 
-- [ ] Every requirement traces to "Decided" in `decisions.md` (nothing left under Assumed or Open questions)
+- [ ] Every requirement traces to the approved `brief.md` (nothing left under "To confirm"); deviations are logged in `decisions.md`
 - [ ] Tests were written first; every scenario has a test
-- [ ] Checks pass (`CHECK_CMDS` in `.claude/flow.conf`)
+- [ ] Full checks pass: typecheck, lint, tests and e2e ("Checks" in `CLAUDE.md`)
 - [ ] `change-verifier` returned PASS (paste the verdict below)
 
 ## Verifier verdict

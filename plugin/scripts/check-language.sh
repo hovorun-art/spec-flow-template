@@ -2,7 +2,7 @@
 # English-only check. Flags Cyrillic, CJK, Arabic, Hebrew, Hangul, Thai and Devanagari
 # in any text file outside TRANSLATIONS_DIR, IGNORED_DIRS, .git and lockfiles (see .claude/flow.conf).
 #   no args : scan every tracked/untracked non-ignored file in the project
-#   <file>  : scan that file only
+#   <file>...: scan those files only 
 #   --post  : PostToolUse mode, read the edited file path from the hook JSON on stdin
 # Exit 2 with offending lines on stderr (PostToolUse feeds this back to Claude).
 # Exceptions: paths matching LANGUAGE_IGNORE (a regex in flow.conf, e.g. test fixtures) and single lines
@@ -26,7 +26,7 @@ dirs = [tr, r'\.git'] + os.environ['IGNORED_DIRS'].split()
 SKIP = re.compile(r'(^|/)(' + '|'.join(dirs) + r')/|(^|/)[^/]*-lock\.(json|yaml)$|(^|/)[^/]*\.lock$')
 USER_SKIP = re.compile(os.environ['LANGUAGE_IGNORE']) if os.environ['LANGUAGE_IGNORE'] else None
 if len(sys.argv) > 1:
-    files = [sys.argv[1]]
+    files = sys.argv[1:]
 else:
     files = subprocess.run(['git', 'ls-files', '-co', '--exclude-standard'],
                            capture_output=True, text=True).stdout.splitlines()

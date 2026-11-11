@@ -1,5 +1,5 @@
-# The same checks as the Stop hook, so the rules hold outside Claude Code too.
-# TODO: keep the steps in sync with CHECK_CMDS in .claude/flow.conf and the project's stack.
+# The full checks ("Checks" in CLAUDE.md, step 3), so the rules hold outside Claude Code too.
+# TODO: keep the steps in sync with the root package.json scripts.
 name: checks
 
 on:
@@ -20,11 +20,32 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: hovorun-art/spec-flow-template
-          ref: v2.0.1
+          ref: v2.2.0
           path: .spec-flow
       - run: mv .spec-flow "$RUNNER_TEMP/spec-flow" && "$RUNNER_TEMP/spec-flow/plugin/scripts/check-language.sh"
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
+      # The Turborepo cache of the root scripts lives in the git directory (see .claude/rules/tooling.md).
+      - uses: actions/cache@v4
+        with:
+          path: .git/turbo-cache
+          key: turbo-checks-${{ github.sha }}
+          restore-keys: turbo-checks-
+      - run: npm run check:full
       - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/cache@v4
+        with:
+          path: .git/turbo-cache
+          key: turbo-e2e-${{ github.sha }}
+          restore-keys: turbo-e2e-
+      - run: npx playwright install --with-deps
+      - run: npm run test:e2e

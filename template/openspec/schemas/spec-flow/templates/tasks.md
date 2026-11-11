@@ -1,18 +1,8 @@
 # Tasks
 
-## Plan
+## 1. <!-- group name: one slice of the work, one commit -->
 
-<!-- Dependency graph of the groups and which could run in parallel (or "none"). The user decides whether they do. -->
+Owns: <!-- files or folders --> · Depends on: <!-- group numbers, or none --> · Done when: <!-- command -->
 
-## 1. <!-- Task Group Name -->
-
-Owns: <!-- files --> · Depends on: <!-- none --> · Parallel with: <!-- none -->
-
-- [ ] 1.1 <!-- Write the failing test for scenario "<name>" -->
-- [ ] 1.2 <!-- Implement it and verify the test passes -->
-
-## 2. <!-- Integration -->
-
-Owns: <!-- files --> · Depends on: 1 · Parallel with: none
-
-- [ ] 2.1 <!-- Wire everything together and verify the full checks pass -->
+- [ ] 1.1 Test "<!-- scenario name -->" (<!-- test file -->)
+- [ ] 1.2 <!-- what is implemented, in which file -->

@@ -92,4 +92,23 @@ else
 fi
 rm -rf "$stop_dir"
 
+# In a git repository the verdict file records the commit it was given on, so the next run can
+# re-check only the gaps and the diff since then: verdict word, commit line, gap lines.
+git_dir=$(mktemp -d)
+mkdir -p "$git_dir/openspec/changes/demo" "$git_dir/.claude"
+git -C "$git_dir" init -q -b feat
+git -C "$git_dir" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+git_head=$(git -C "$git_dir" rev-parse HEAD)
+python3 -c 'import json,sys; print(json.dumps({"agent_type":"change-verifier","stop_hook_active":True,"last_assistant_message":sys.argv[1]}))' \
+  "$PARTIAL_TEXT" | CLAUDE_PROJECT_DIR="$git_dir" bash "$HOOK" stop >/dev/null
+expected_verdict=$(printf 'PARTIAL\ncommit: %s\n- a gap' "$git_head")
+actual_verdict=$(cat "$git_dir/openspec/changes/demo/.verdict" 2>/dev/null)
+if [ "$actual_verdict" = "$expected_verdict" ]; then
+  echo "ok   stop: records the commit and the gaps in a git repository"
+else
+  echo "FAIL stop: records the commit and the gaps in a git repository: got '$actual_verdict'"
+  failures=$((failures + 1))
+fi
+rm -rf "$git_dir"
+
 [ "$failures" -eq 0 ] && echo "all passed" || { echo "$failures failed"; exit 1; }
