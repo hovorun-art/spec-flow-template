@@ -22,12 +22,7 @@ once, at the end of the change. In the rest of this document "the area" then mea
 ## Scope: only this area
 
 Judge the tests against what this level can and should see. The project's test levels, their file
-patterns and what each one mocks are defined in `.claude/rules/testing.md` (read it first); typically:
-- **E2e of one app**: the app as a black box through its public interface (HTTP API, CLI, UI) and
-  through its inputs and outputs at the mocked boundaries (messages in, calls to other services
-  out). Its own storage may be real.
-- **Integration**: one adapter against its real dependency.
-- **Unit**: one class or module with its dependencies mocked.
+patterns and what each one mocks are defined in `.claude/rules/testing.md`: read it first.
 
 A corner case belongs to the area only if this level can set it up and observe its result. Leave out
 cases that belong elsewhere (a real adapter's behaviour, another app's behaviour, the full system).
@@ -55,8 +50,10 @@ at this level that a lower level already covers.
 
 1. Read the area's tests in full.
 2. Work out what the area promises, from the sources and not from the tests:
-   - the main specs in `openspec/specs/*/spec.md` that describe this area's behaviour (every
-     requirement and WHEN/THEN scenario);
+   - the specs that describe this area's behaviour (every requirement and WHEN/THEN scenario):
+     the main specs in `openspec/specs/**/spec.md`, and the delta specs of the active change in
+     `openspec/changes/<name>/specs/**/spec.md` (not `archive/`), which hold the behaviour being
+     built now and are not in the main specs until the change is archived;
    - the area's entry points (routes, handlers, consumers, components), the contracts they use and
      the implementations behind them;
    - the config values that change behaviour (limits, timeouts, page sizes).

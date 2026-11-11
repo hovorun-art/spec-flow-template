@@ -39,13 +39,15 @@ works is decided later, inside its own change, through its `brief.md`.
    with AskUserQuestion (see "Asking" in CLAUDE.md):
    what is in the first milestone, what can wait, which order. Anything the concept does not settle stays
    an open question in that milestone's file, not an assumption.
-5. **Write the files** (English), keeping the template's layout. Edit only the milestones that change;
+5. **Write the files** (English) on a `docs/roadmap` branch, never on the main branch (a hook denies
+   it): run the `spec-flow:start` skill first if you are still on it. Keep the template's layout. Edit only the milestones that change;
    to insert a milestone between two others, pick a free number or renumber only when the user agrees.
    Remove the template's TODO.
 6. **Show the status.** One compact block: per milestone, its changes with the status derived from
    `openspec/changes/`, and the next candidates (`planned` changes whose dependencies are `done`).
-7. **Offer the next step.** Through AskUserQuestion: `/spec-flow:propose <name>` for a next candidate, or other
-   options that fit.
+7. **Offer the next step.** Through AskUserQuestion. After writing: commit and the `spec-flow:finish`
+   skill, since a change's worktree starts from the main branch and sees the roadmap only once it is
+   merged. Otherwise: the `spec-flow:start` skill for a next candidate, or other options that fit.
 
 ## Rules
 

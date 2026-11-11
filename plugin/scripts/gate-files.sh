@@ -4,12 +4,15 @@
 #   brief (openspec/changes/<name>/.decisions-approved, which only approve.sh creates). The marker holds
 #   the sha256 of brief.md at approval, so any later edit of brief.md needs a new approval. A change of
 #   the older schema has decisions.md in the brief's place.
-# - The state files are never written by an agent, only by the hooks: .decisions-approved (approve.sh),
-#   .verdict and .verify-running (verifier-hooks.sh).
+# - The state files are never written by an agent, only by the hooks: .decisions-approved (approve.sh)
+#   and .verdict (verifier-hooks.sh).
+# - No agent writes an agent definition named change-verifier (.claude/agents/): the verdict hook would
+#   record its PASS as the verifier's.
 # - `openspec archive <name>` runs only after the verifier's PASS on the current commit: .verdict starts
 #   with PASS, its `commit:` is HEAD, and nothing outside openspec/ is uncommitted.
 # Bash commands are checked by their text: one that names a guarded path and writes (redirect, tee, cp,
-# mv, touch, rm, sed -i, an interpreter...) is denied. Reading those files stays allowed. Literal commit
+# mv, touch, rm, sed -i, an interpreter...) is denied, also when a `cd` earlier in the command makes the
+# path relative (`cd openspec/changes/<name> && echo x > tasks.md`). Reading those files stays allowed. Literal commit
 # messages (-m '...', -m "..." without $ or a backtick, "$(cat <<'EOF' ... EOF)") are not part of that
 # text: a message may name a guarded file and hold a ">" (the Co-Authored-By trailer).
 input=$(cat)
@@ -21,7 +24,8 @@ tool = d.get('tool_name', '')
 ti = d.get('tool_input') or {}
 cwd = d.get('cwd') or os.environ.get('CLAUDE_PROJECT_DIR') or os.getcwd()
 
-STATE = re.compile(r'(^|[/\s\'"])\.(decisions-approved|verdict|verify-running)\b')
+STATE = re.compile(r'(^|[/\s\'"])\.(decisions-approved|verdict)\b')
+VERIFIER_AGENT = re.compile(r'\.claude/agents/[^/\s\'"]*change-verifier[^/\s\'"]*\.md\b')
 GATED = re.compile(r'((?:[^\s\'"]*/)?)openspec/changes/([^/\s\'"]+)/(specs/|design\.md|tasks\.md)')
 WRITES = re.compile(r'>|\b(tee|cp|mv|touch|rm|ln|truncate|dd|install|perl|python3?|node|ruby)\b|\bsed\s+(-[a-zA-Z]*i|--in-place)')
 
@@ -66,8 +70,23 @@ def gate_reason(name):
     ).format(name)
 
 
-STATE_REASON = ("Blocked: this is a state file owned by the spec-flow hooks (.decisions-approved, .verdict, "
-                ".verify-running). Agents never write, move or delete it.")
+STATE_REASON = ("Blocked: this is a state file owned by the spec-flow hooks (.decisions-approved, .verdict). "
+                "Agents never write, move or delete it.")
+AGENT_REASON = ("Blocked: the change-verifier agent comes from the spec-flow plugin. A project agent of that "
+                "name would have its verdict recorded as the verifier's, so agents never write one.")
+GATED_WORD = re.compile(r'[^\s\'"<>|;&()]*(?:specs/[^\s\'"<>|;&()]*|design\.md|tasks\.md)')
+
+
+def after_cd(cmd):
+    """The guarded paths this command names relative to a directory it changed into, made absolute."""
+    base, found = cwd, []
+    for m in re.finditer(r'(?:^|[;&|\n(])\s*cd\s+("[^"]*"|\'[^\']*\'|[^\s;&|)]+)', cmd):
+        base = os.path.normpath(os.path.join(base, os.path.expanduser(m.group(1).strip('\'"'))))
+        found.append(base + '/')  # inside specs/ every write counts
+        for word in GATED_WORD.findall(cmd):
+            if not os.path.isabs(word):
+                found.append(os.path.normpath(os.path.join(base, word)) + ('/' if word.endswith('/') else ''))
+    return found
 
 def without_messages(cmd):
     """The command without the literal text of commit messages, which runs nothing and writes nothing."""
@@ -139,7 +158,9 @@ if tool == 'Bash':
         sys.exit(0)
     if STATE.search(cmd) and not re.match(r'\s*git\s+(add|status|diff|log|show)\b', cmd):
         deny(STATE_REASON)
-    for prefix, name, _ in GATED.findall(cmd):
+    if VERIFIER_AGENT.search(cmd):
+        deny(AGENT_REASON)
+    for prefix, name, _ in GATED.findall(cmd) + [g for p in after_cd(cmd) for g in GATED.findall(p)]:
         if name != 'archive' and not approved(prefix, name):
             deny(gate_reason(name))
     sys.exit(0)
@@ -149,6 +170,8 @@ if not path:
     sys.exit(0)
 if STATE.search('/' + os.path.basename(path)):
     deny(STATE_REASON)
+if VERIFIER_AGENT.search(path):
+    deny(AGENT_REASON)
 m = GATED.search(path)
 if m and m.group(2) != 'archive' and not approved(m.group(1), m.group(2)):
     deny(gate_reason(m.group(2)))

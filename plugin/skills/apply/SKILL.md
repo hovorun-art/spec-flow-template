@@ -30,8 +30,8 @@ Implement change `$ARGUMENTS`. With no name: use the only active change, or ask
    - for each task: the test first, see it fail for the expected reason, the least code that
      passes; then check its box (`- [ ]` → `- [x]`). Check a box only when the task is fully done.
      Stay inside the files the group lists under "Owns";
-   - when the group's tasks are done: `npm run check`, then the `spec-flow:test-case-reviewer`
-     subagent (Sonnet) on the test files the group wrote or changed; act on its report;
+   - when the group's tasks are done: step 2 of "Checks" (the check and the test review); act on
+     the review's report;
    - commit the group (one commit, `tasks.md` with its checked boxes included) and report the
      commit (hash, files, message) before the next group starts.
    E2e tests run only here, in the main agent.
@@ -44,10 +44,9 @@ Implement change `$ARGUMENTS`. With no name: use the only active change, or ask
    what triggered it are appended to `decisions.md`.
 
 5. **Done means verified.** When every task is checked and committed, run step 3 of "Checks" in
-   CLAUDE.md, in its order: the Opus test review and `spec-flow:change-verifier` together, fixes
-   (their own commit) until PASS, then `npm run check:full` and `npm run test:e2e` once. No hook
-   runs this for you, and a hook denies the archive without a PASS on the current commit. Show the
-   user the verifier's "Against the brief" list, then offer `/spec-flow:archive <name>`.
+   CLAUDE.md, in its order. No hook runs it for you, and a hook denies the archive without the
+   verifier's PASS on the current commit. Show the user the verifier's "Against the brief" list,
+   then offer `/spec-flow:archive <name>`.
 
 Merging is never part of apply: that is `spec-flow:finish`.
 

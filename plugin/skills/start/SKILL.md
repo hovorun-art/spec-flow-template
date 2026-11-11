@@ -26,9 +26,8 @@ branch first.
    - Name: `fix/<kebab-name>` for a fix, `docs/<kebab-name>` for an instruction or docs update.
    - `git switch -c <branch> <MAIN_BRANCH>` (from the main branch's tip; never reuse a branch of other work).
    - Then do the work there: a fix starts with a test that reproduces the bug and fails, then the fix,
-     then the lighter checks for small work (step 3 of "Checks" in `CLAUDE.md`: `npm run check`, the
-     Sonnet test review of the changed test files, the e2e of the touched workspaces only). Commit as
-     you go (no approval needed off the main branch). When it is done, run the `spec-flow:finish` skill.
+     then the lighter checks for small work (the end of "Checks" in `CLAUDE.md`). Commit as you go (no
+     approval needed off the main branch). When it is done, run the `spec-flow:finish` skill.
 
 4. **Change: its own worktree and session.**
    - Name: kebab-case, the roadmap item's name if it comes from `docs/roadmap/`. It is the change name and

@@ -16,15 +16,16 @@ Archive change `$ARGUMENTS`. With no name: use the only active change, or ask
      `totalTasks`;
    - step 3 of "Checks" in CLAUDE.md is done on the current commit: the first line of
      `openspec/changes/<name>/.verdict` is `PASS`, its `commit:` line is `git rev-parse HEAD`, and
-     `git status --porcelain` shows nothing outside `openspec/`. A hook denies the archive
-     otherwise. If not, run step 3 now and fix what fails.
+     `git status --porcelain` shows nothing outside `openspec/`. If not, run step 3 now and fix
+     what fails.
 
 3. **Archive.** `openspec archive "<name>" -y`. The CLI merges the delta specs into
    `openspec/specs/` and moves the change to `openspec/changes/archive/<date>-<name>/`, with its
    brief and decision log. If it reports an error, show it and stop: nothing was moved.
 
 4. **Check the result.** `openspec validate --specs`; fix what it reports in the main specs. A
-   new main spec left with a `TBD` Purpose gets a real one now.
+   new main spec takes its Purpose from the delta; one left with `TBD` (the delta had none) gets
+   a real one now.
 
 5. **Commit** the archive on the change branch (the main specs and the moved change) and report
    the commit.

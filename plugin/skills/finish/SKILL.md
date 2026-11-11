@@ -17,11 +17,10 @@ Never merge any other way (`git pull`, `git push origin <branch>:<main>`, `gh pr
    - A change (`openspec/changes/archive/` holds it, or `openspec/changes/<branch>/` still exists): it was
      archived after `spec-flow:change-verifier` returned PASS. If not, say what is missing
      (`/spec-flow:apply`, the verifier, `/spec-flow:archive`) and stop.
-   - Step 3 of "Checks" in `CLAUDE.md` is done for the branch's last commit. A change: it ran before the
-     archive; rerun `npm run check:full` rather than guess (it replays from the Turborepo cache when
-     nothing changed). A fix: the lighter checks (`npm run check`, the Sonnet test review of the changed
-     test files, `npm run test:e2e -- --filter=<workspace>` for each workspace it touched). A docs-only
-     branch needs none. Fix what fails before offering anything.
+   - The checks are done for the branch's last commit ("Checks" in `CLAUDE.md`). A change: step 3 ran
+     before the archive; rerun `npm run check:full` rather than guess (it replays from the Turborepo
+     cache when nothing changed). A fix or docs branch: the lighter set for small work described there.
+     Fix what fails before offering anything.
    - Show the commits the branch adds: `git log --oneline <MAIN_BRANCH>..<branch>`.
 
 2. **Ask what to do** with AskUserQuestion (single choice, these options):
@@ -33,8 +32,11 @@ Never merge any other way (`git pull`, `git push origin <branch>:<main>`, `gh pr
    - "Leave it": stop.
 
 3. **Merge** (only after the user picked it in step 2):
-   - Find the main checkout: the first `worktree` entry of `git worktree list --porcelain`. It must be on
-     the main branch with a clean `git status --porcelain`; if not, stop and tell the user.
+   - Find the main checkout: the first `worktree` entry of `git worktree list --porcelain`. Its
+     `git status --porcelain` must be clean; if not, stop and tell the user.
+   - The main checkout must be on the main branch. A change's worktree leaves it there. A `fix/` or
+     `docs/` branch lives in the main checkout itself: when it is on the branch being finished, run
+     `git -C <main checkout> switch <MAIN_BRANCH>` first. On any other branch, stop and tell the user.
    - `git -C <main checkout> merge --no-ff <branch>`. The hook asks the user once more; if they decline,
      stop. On a conflict, stop and show the conflicting files; abort (`git -C <main checkout> merge
      --abort`) only if the user asks.
@@ -46,5 +48,6 @@ Never merge any other way (`git pull`, `git push origin <branch>:<main>`, `gh pr
      `git worktree remove <path> && git branch -d <branch>` yourself. If it runs inside the worktree, it
      cannot remove its own folder: tell the user to close this session and either run that command from
      the main checkout or send `/spec-flow:finish <branch>` to a session there, which does the cleanup.
-   - A branch in the main checkout: `git switch <MAIN_BRANCH> && git branch -d <branch>`.
+   - A branch in the main checkout: `git switch <MAIN_BRANCH>` (unless the merge already did) and
+     `git branch -d <branch>`.
    - `git branch -d` refuses an unmerged branch; never force it (`-D`) without the user asking.

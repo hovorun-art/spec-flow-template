@@ -56,7 +56,7 @@ English only: briefs, specs, tasks, code, comments, identifiers, UI strings in c
 messages and docs. Other languages only inside dedicated translation files (e.g. `locales/`);
 text shown to users must come from those files, never be hardcoded in code.
 Chat with the user and AskUserQuestion questions/options may be in the user's language; files stay
-English. Deliberate exceptions (e.g. a test for Cyrillic input) carry `allow-non-english` on the line
+English, and so does the one option label a hook reads: "Approve the brief". Deliberate exceptions (e.g. a test for Cyrillic input) carry `allow-non-english` on the line
 or match `LANGUAGE_IGNORE` in `.claude/flow.conf`.
 
 ## Workflow
@@ -148,7 +148,7 @@ of a check whose inputs did not change, so rerunning one is cheap.
    A hook denies the archive without a PASS on the current commit, or with uncommitted changes
    outside `openspec/`.
 
-Small work, before `spec-flow:finish`, is lighter. A fix: `npm run check`, the Sonnet test review of
+Small work (a `fix/` or `docs/` branch), before `spec-flow:finish`, is lighter. A fix: `npm run check`, the Sonnet test review of
 the test files it changed, and the e2e of the workspaces it touched
 (`npm run test:e2e -- --filter=<workspace>`). A docs-only branch: nothing.
 

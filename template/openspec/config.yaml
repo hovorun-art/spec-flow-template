@@ -1,19 +1,13 @@
 schema: spec-flow
 
-# Project facts for every artifact. The flow's own rules (decisions, approval, test first, task groups)
+# Project facts for every artifact. The flow's own rules (brief, approval, test first, task groups)
 # live in openspec/schemas/spec-flow/schema.yaml and CLAUDE.md; keep only what is specific to this product.
+# This text is added to every `openspec instructions` answer, so keep it short: the stack, the layout
+# and the code rules are already in CLAUDE.md and .claude/rules/.
 context: |
-  TODO: what the product is and for whom.
-  Stack: TypeScript monorepo (npm workspaces): backend services on Node (apps/<service>), a React +
-  Vite web app (apps/web), shared packages kernel, contracts (Zod schemas) and service-kit.
-  TODO: the server framework, the database and other infrastructure.
-  Architecture and code rules: .claude/rules/backend.md (DDD, onion layers, OOP), .claude/rules/web.md
-  (functional React), .claude/rules/testing.md (test levels). Read the ones the change touches before
-  writing design.md or tasks.md.
-  Specs describe user-visible behaviour and edge cases, not implementation.
-  Language: English only in all artifacts; other languages only in translation files (e.g. locales/).
+  TODO: what the product is and for whom, in two or three lines.
 
-# Per-artifact rules for this project (proposal, decisions, specs, design, tasks), for example:
+# Per-artifact rules for this project (brief, specs, tasks), for example:
 # rules:
 #   specs:
 #     - 'Every API error scenario names the HTTP status'

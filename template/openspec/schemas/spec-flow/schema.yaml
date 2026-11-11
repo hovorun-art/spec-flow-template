@@ -48,10 +48,12 @@ artifacts:
       is not clearly theirs goes here, not into Product or Technical.
 
       Resolve the list with the AskUserQuestion tool (see "Asking" in
-      CLAUDE.md): questions first, up to 4 per call, then all assumptions in
-      one multiSelect call. After each call, write the answer into Product or
-      Technical and delete the item; a rejected assumption becomes a
-      question. The brief is ready when "To confirm" is empty.
+      CLAUDE.md): questions first, up to 4 per call, each with "Drop this
+      question" as one option; then all assumptions in one multiSelect call,
+      where the user keeps what they accept. After each call, write the
+      answer into Product or Technical and delete the item; a rejected
+      assumption becomes a question. The brief is ready when "To confirm" is
+      empty.
 
       **Decision log** (`decisions.md` next to the brief): the history of why,
       which the brief has no room for. Append one line each time something
@@ -68,9 +70,10 @@ artifacts:
 
       Approval: show the whole brief in chat and offer approval with
       AskUserQuestion: a question that names the change, for example "Approve
-      the brief of `<name>`?", with the option labelled exactly "Approve the
-      brief" first. The hook records approval only from the user's pick or
-      from /spec-flow:specs-go <name> typed by the user.
+      the brief of `<name>`?", with the options "Approve the brief" (first;
+      this label exactly, in English even when the question is in the user's
+      language) and "Not yet". The hook records approval only from the user's
+      pick or from /spec-flow:specs-go <name> typed by the user.
     requires: []
 
   - id: approval
@@ -83,9 +86,9 @@ artifacts:
       /spec-flow:specs-go <name>), and only when brief.md has no unchecked
       item left. Writing it yourself is blocked.
 
-      While it is missing: stop the planning workflow here, resolve everything
-      under "To confirm" with the user, and offer approval as the brief
-      instruction describes. Specs and tasks stay blocked until then, and
+      While it is missing: stop the planning workflow here and follow the end
+      of the brief instruction (`openspec instructions brief`): resolve
+      everything under "To confirm" with the user, then offer approval. Specs and tasks stay blocked until then, and
       again after any later edit of brief.md.
     requires:
       - brief

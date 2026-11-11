@@ -31,11 +31,10 @@ code is edited here, and implementation starts only when the user asks for `/spe
      artifacts it depends on from disk, not from memory.
    - **brief**: write `brief.md`, and `decisions.md` next to it with one line per decision made so
      far and its reason.
-   - **approval**: never write it. Settle every item under "To confirm" with AskUserQuestion (see
-     "Asking" in CLAUDE.md), write each answer into the brief and its reason into `decisions.md`,
-     show the whole brief in chat, then ask "Approve the brief of `<name>`?" with the option
-     "Approve the brief" first. A hook records the approval. If the user does not approve, stop
-     and say what is still open.
+   - **approval**: never write it. Settle every item under "To confirm" and offer approval the
+     way the brief instruction says (the order of the questions, the exact "Approve the brief"
+     label). A hook records the approval. If the user does not approve, stop and say what is
+     still open.
    - **specs**, then **tasks**: only after the hook reported the approval. If something the brief
      does not settle comes up, stop, add it to "To confirm", ask, and get the brief approved again.
 

@@ -76,6 +76,14 @@ run_case "the approval marker is never written by an agent" Write '__DIR__/opens
 run_case "the verdict is never written through Bash" Bash 'echo PASS > openspec/changes/demo/.verdict' deny
 run_case "reading the verdict is allowed" Bash 'cat openspec/changes/demo/.verdict' none
 run_case "a redirect into unapproved specs is blocked" Bash 'echo x > openspec/changes/draft/specs/a.md' deny
+run_case "a relative write after cd into an unapproved change is blocked" Bash 'cd openspec/changes/draft && echo x > tasks.md' deny
+run_case "a relative write after cd into the changes folder is blocked" Bash 'cd openspec/changes; echo x > draft/specs/a.md' deny
+run_case "a write after cd into unapproved specs is blocked" Bash 'cd openspec/changes/draft/specs && echo x > a.md' deny
+run_case "a relative write after cd into an approved change is allowed" Bash 'cd openspec/changes/demo && echo x > tasks.md' none
+run_case "a write elsewhere after cd is left alone" Bash 'cd src && echo x > specs/a.ts' none
+run_case "a project agent named change-verifier is never written" Write '__DIR__/.claude/agents/change-verifier.md' deny
+run_case "a project agent named change-verifier is never written through Bash" Bash 'cp x.md .claude/agents/change-verifier.md' deny
+run_case "another project agent may be written" Write '__DIR__/.claude/agents/helper.md' none
 
 run_case "a commit message naming a state file is allowed" Bash "git commit -m 'chore: ignore .verdict
 

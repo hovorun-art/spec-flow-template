@@ -1,6 +1,7 @@
 #!/bin/bash
 # English-only check. Flags Cyrillic, CJK, Arabic, Hebrew, Hangul, Thai and Devanagari
-# in any text file outside TRANSLATIONS_DIR, IGNORED_DIRS, .git and lockfiles (see .claude/flow.conf).
+# in any text file of the project outside TRANSLATIONS_DIR, IGNORED_DIRS, .git and lockfiles (see
+# .claude/flow.conf). Files outside the project (scratchpad, memory) are not checked.
 #   no args : scan every tracked/untracked non-ignored file in the project
 #   <file>...: scan those files only 
 #   --post  : PostToolUse mode, read the edited file path from the hook JSON on stdin
@@ -31,8 +32,12 @@ else:
     files = subprocess.run(['git', 'ls-files', '-co', '--exclude-standard'],
                            capture_output=True, text=True).stdout.splitlines()
 hits = []
+project = os.path.realpath(os.getcwd()) + os.sep
 for f in files:
-    f = f.removeprefix(os.getcwd() + '/')
+    real = os.path.realpath(f)
+    if not real.startswith(project):
+        continue  # scratchpad, memory and other files outside the project are not the project's text
+    f = real.removeprefix(project)
     if SKIP.search(f) or (USER_SKIP and USER_SKIP.search(f)):
         continue
     try:

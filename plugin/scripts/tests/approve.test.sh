@@ -48,4 +48,22 @@ run_case "picking Not yet approves nothing" --answer "$(answer 'Approve the brie
 run_case "approval for a question that names no change is ignored" --answer "$(answer 'Approve the brief?' 'Approve the brief')" demo not
 run_case "the option does not approve a brief with items to confirm" --answer "$(answer 'Approve the brief of `draft`?' 'Approve the brief')" draft not
 
+run_case "a translated label approves nothing" --answer "$(answer 'Затвердити бриф demo?' 'Затвердити бриф')" demo not # allow-non-english
+
+# note_case <name> <question> <picked label> <expected: note|silent>: whether the agent is told to ask again.
+note_case() {
+  local name="$1" expected="$4" dir actual=silent
+  dir=$(make_project)
+  answer "$2" "$3" | CLAUDE_PROJECT_DIR="$dir" bash "$HOOK" --answer | grep -q 'ask it again' && actual=note
+  if [ "$actual" = "$expected" ]; then
+    echo "ok   $name"
+  else
+    echo "FAIL $name: expected '$expected', got '$actual'"
+    failures=$((failures + 1))
+  fi
+  rm -rf "$dir"
+}
+note_case "a translated label on a ready brief tells the agent to ask again" 'Затвердити бриф demo?' 'Затвердити бриф' note # allow-non-english
+note_case "a question about a brief with items to confirm stays silent" 'Which limit for draft?' '10' silent
+
 [ "$failures" -eq 0 ] && echo "all passed" || { echo "$failures failed"; exit 1; }

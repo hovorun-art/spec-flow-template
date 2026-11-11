@@ -7,6 +7,8 @@
 # The marker is created only when brief.md has no unchecked item ("- [ ]") left under "To confirm";
 # otherwise the agent is told what is still unresolved. It records the sha256 of brief.md, so
 # gate-files.sh treats a later edit of brief.md as unapproved.
+# The label is matched in English only. When a question names a change whose brief is ready and offers
+# no such option (a translated label), the agent is told to ask again instead of nothing happening.
 # A change written with the older schema has decisions.md instead of brief.md; it is used when there is
 # no brief.md, and the older label "Approve decisions" still counts.
 mode="$1"
@@ -82,6 +84,39 @@ for q in picked:
     else:
         notes.append('spec-flow: "Approve the brief" was picked, but the question did not name an active '
                      'change, so nothing was approved. Ask again with the change name in the question.')
+
+
+def ready_unapproved(name):
+    """brief.md has nothing left to confirm, and no marker holds its current hash."""
+    folder = os.path.join(changes, name)
+    try:
+        data = open(os.path.join(folder, 'brief.md'), 'rb').read()
+    except OSError:
+        return False
+    if re.search(rb'^\s*- \[ \]', data, re.M):
+        return False
+    try:
+        marker = open(os.path.join(folder, '.decisions-approved'), encoding='utf-8').read()
+    except OSError:
+        return True
+    return hashlib.sha256(data).hexdigest() not in marker
+
+
+# A question about a change whose brief is ready, with no "Approve the brief" option at all: most
+# likely the approval question with a translated label, which would otherwise fail silently.
+for q in ti.get('questions', []):
+    if not isinstance(q, dict) or q.get('question', '') in picked:
+        continue
+    labels = [o.get('label', '') for o in q.get('options') or [] if isinstance(o, dict)]
+    if any(re.match(APPROVE, l.strip(), re.I) for l in labels):
+        continue
+    text = q.get('question', '')
+    hit = next((n for n in names if re.search(r'(?<![\w-])' + re.escape(n) + r'(?![\w-])', text)), None)
+    if hit and ready_unapproved(hit):
+        notes.append(f"spec-flow: the brief of '{hit}' is ready but not approved, and this question had no "
+                     'option labelled "Approve the brief". If it was the approval question, ask it again '
+                     'with that label exactly, in English (the question itself may be in the user\'s '
+                     'language). Nothing was approved.')
 if notes:
     say('\n'.join(notes))
 PY
