@@ -14,7 +14,7 @@ Archive a completed change in the experimental workflow.
 
 **spec-flow additions:**
 - **Verified first**: archive only after `spec-flow:change-verifier` returned PASS for the current code: the first line of `openspec/changes/<name>/.verdict` is `PASS` and no project file changed after it. If not, run the verifier (foreground) and fix its gaps before archiving.
-- **On the change branch**: archive on the change's own branch, before it is merged, so the merge brings the code and the updated main specs (`openspec/specs/`) together. Committing and merging need the user's approval.
+- **On the change branch**: archive on the change's own branch, before it is merged, so the merge brings the code and the updated main specs (`openspec/specs/`) together. Committing on the change branch needs no approval; merging needs the user's approval.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`, `schemas`, `view`). Once selected, treat `--store <id>` as sticky for the rest of the workflow. Every unscoped example of those commands below is shorthand: before running it, append the flag. For example, run `openspec status --change "<name>" --json --store "<id>"`, not the unscoped form shown below. Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 

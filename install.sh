@@ -39,7 +39,7 @@ echo "updated .gitignore"
 # Files from the copy-everything version (v1) that the plugin now provides; left in place they run twice.
 legacy=()
 for f in .claude/hooks .claude/commands/opsx .claude/commands/specs-go.md .claude/commands/work-on.md \
-         .claude/agents/change-verifier.md .claude/skills/openspec-propose .claude/skills/openspec-explore \
+         .claude/agents/change-verifier.md .claude/agents/test-case-reviewer.md .claude/skills/openspec-propose .claude/skills/openspec-explore \
          .claude/skills/openspec-apply-change .claude/skills/openspec-archive-change \
          .claude/skills/openspec-sync-specs .claude/skills/openspec-update-change \
          .claude/skills/roadmap .claude/skills/ui-from-screenshots; do

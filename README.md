@@ -62,23 +62,31 @@ Updating: the plugin updates through `claude plugin update`. The schema in
   agent from writing the state files (`.decisions-approved`, `.verdict`, ...), through Write/Edit and
   through Bash.
 - **Verifier**: `change-verifier` (Opus, read-only) checks the code against specs and decisions. A
-  SubagentStop hook records its verdict from its final message, so the main agent cannot write a PASS.
-  The Stop hook keeps the main agent working until a fresh PASS exists.
+  SubagentStop hook records its verdict from its final message (or, for a background run, from the
+  report it hands back through `SubagentHandback`), so the main agent cannot write a PASS. The Stop
+  hook keeps the main agent working until a fresh PASS exists. It also looks for duplicated logic.
+- **Test review**: `test-case-reviewer` (Opus, read-only) reviews one test area for missing corner
+  cases, weak assertions and cases that belong to a lower test level. Every task group that writes
+  tests ends with this review, and `apply` runs it even when `tasks.md` has no review task.
 - **Hooks**: lint on every edit, an "English only" check outside `locales/` (with `LANGUAGE_IGNORE` and
-  `allow-non-english` for exceptions), full checks on Stop.
+  `allow-non-english` for exceptions), full checks on Stop, only when a file matching `CHECK_TRIGGER`
+  changed since the last green run (docs and instructions do not start a full test run).
 - **TDD**: every spec scenario gets a test that is written and seen failing first. `TDD_STRICT=1` turns
   on `tdd-guard.sh`, which blocks source edits until a test has changed on the branch (in parallel
   worktrees too).
 - **Small fixes**: bug fixes that add no behaviour skip OpenSpec but keep the branch and the test first.
-- **Git**: `guard-git.sh` makes Claude Code ask before any commit, push, merge, rebase, reset or
-  `gh pr merge`; each change is built on its own branch, never on the main branch.
+- **Git**: `guard-git.sh` allows `git commit` and `git cherry-pick` on any branch but the main one
+  and denies them on it; push, merge, rebase, reset, revert, tag and `gh pr merge` ask the user. Each
+  change is planned, built and archived on its own branch, one commit per task group.
+- **Tests**: subagents run only the tests related to their changes and never e2e; they list the e2e
+  files and the main agent runs them.
 - **Skills** (`/spec-flow:<name>`): `explore`, `propose`, `specs-go`, `apply`, `update`, `sync`,
   `archive` (OpenSpec workflows adapted to the flow), `roadmap`, `ui-from-screenshots` (builds UI from
   screenshots and checks the result by screenshotting the running app), `work-on` (one task group in a
   worktree).
 - **Parallel work**: sequential by default. If `tasks.md` has independent groups, the user decides
-  whether to run them in parallel; then Claude runs one subagent per group in its own worktree and
-  brings the results into the change branch.
+  whether to run them in parallel; then Claude runs one subagent per group in its own worktree, each
+  commits its group there, and the main agent cherry-picks the commits onto the change branch.
 - **GitHub**: a CI workflow with the same checks and a PR template that links the change, the roadmap
   item and the verifier verdict.
 
@@ -87,4 +95,5 @@ Updating: the plugin updates through `claude plugin update`. The schema in
 ```bash
 claude plugin validate plugin --strict
 claude --plugin-dir ./plugin          # try it in a session without installing
+for t in plugin/scripts/tests/*.test.sh; do bash "$t"; done   # hook tests
 ```

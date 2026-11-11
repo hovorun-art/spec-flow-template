@@ -15,14 +15,24 @@ or match `LANGUAGE_IGNORE` in `.claude/flow.conf`.
 
 ## Git
 
-- Never commit, amend, push, merge, rebase or reset without the user's explicit approval. When work
-  is ready to commit, show what will go in and the message; a hook makes Claude Code ask before each
-  such git command. One approval covers one command, not later ones. Never route around the prompt
-  (other tools, `--no-verify`, scripts).
+- Commits on a change or fix branch need no approval: the main agent and subagents commit their
+  own work there (the hook allows `git commit` and `git cherry-pick` off the main branch) and report
+  the commit (files and message) afterwards. Never commit on the main branch (`MAIN_BRANCH` in
+  `.claude/flow.conf`): the hook denies it, the main branch only receives merges.
+- Never push, merge, rebase, reset, amend or revert without the user's explicit approval; the hook
+  makes Claude Code ask before each such git command. One approval covers one command, not later
+  ones. Never route around the prompt (other tools, `--no-verify`, scripts).
 - New features are built on their own branch, never on the main branch (`MAIN_BRANCH` in
-  `.claude/flow.conf`): one branch per change, named after the change (`<change>`). Only planning
-  artifacts (`openspec/changes/<change>/`) go on the main branch; the change is archived on its own
-  branch, so the merge brings the code and the updated main specs together.
+  `.claude/flow.conf`): one branch per change, named after the change (`<change>`), created before
+  the first planning artifact. Planning (`openspec/changes/<change>/`), code and the archive all go on
+  that branch; the main branch only receives the merge, which brings the code and the updated main
+  specs together.
+- One commit per task group: when a group of `tasks.md` is done (its boxes checked, its test review
+  acted on, the checks green), commit it (the files, including the checked boxes, with a
+  Conventional Commits message for that group) and report the commit before starting the next
+  group. Groups are never folded into one commit, and a group is not split across commits. With
+  parallel groups, each subagent commits its group in its worktree and the main agent cherry-picks
+  that commit onto the change branch.
 
 ## Testing (TDD)
 
@@ -32,6 +42,31 @@ or match `LANGUAGE_IGNORE` in `.claude/flow.conf`.
   name the test after the scenario so the verifier can trace it.
 - Fix the code, not the test. Change a test only when it contradicts the spec, and then say so.
 - Tests are deterministic: time, randomness and I/O come in through parameters or fakes.
+  <!-- TODO: how dependencies are mocked (library, one-shot stubs), how time is faked. -->
+- Test data never comes from the app's own code (its id or random generators): generated values
+  come from the platform directly, held in a named constant when a test compares the same value
+  twice; no hardcoded ids.
+- One test file per source file, next to it; no grab-bag test files. Test behaviour, not language
+  facts: no tests that a constant exists or has a given type.
+- Levels: <!-- TODO: each test level, its file pattern and what it mocks, e.g. unit (`*.test.ts`
+  next to the code), integration (`*.int.test.ts`, one adapter against its real dependency),
+  e2e (`test/e2e/`, the app as a black box). -->
+- After writing or changing tests, run the `spec-flow:test-case-reviewer` subagent in the
+  foreground on that area. Give it only the area (app or package and test level, or the file), not
+  your own reasoning, so it judges the cases independently. Add the missing corner cases it
+  reports, or tell the user why a case does not belong to that area. This covers every area with
+  test changes, not only the main one; `tasks.md` gives each group that writes tests a review task,
+  and `/spec-flow:apply` runs the review even when that task is missing.
+- Run only the tests related to what changed: every test that imports a changed file, directly or
+  through other modules, plus changed test files, not the whole suite
+  (<!-- TODO: the command, e.g. `npx vitest related --run <changed files>...` -->). Run a whole app
+  or level only with a reason (a change to shared wiring, config or a module many files use, or the
+  final check before a commit), and say what the reason is.
+- E2e tests (<!-- TODO: which files and commands -->) run only in the main agent. Subagents
+  (`spec-flow:work-on`, `spec-flow:test-case-reviewer`, `spec-flow:change-verifier` and any other)
+  never run them: several stacks at once overload the machine. A subagent runs unit and integration
+  tests of its area only, and lists the e2e files the main agent should run; the main agent runs
+  them and acts on the result.
 - With `TDD_STRICT=1` in `.claude/flow.conf`, a hook blocks edits to source files until a test file
   has changed on the branch.
 
@@ -39,7 +74,8 @@ or match `LANGUAGE_IGNORE` in `.claude/flow.conf`.
 
 <!-- TODO: keep in sync with CHECK_CMDS in .claude/flow.conf -->
 - `npm run dev` / `npm run build`
-- `npm run typecheck`, `npm run lint`, `npm test` (all three run by the Stop hook)
+- `npm run typecheck`, `npm run lint`, `npm test` (all three run by the Stop hook, only when a file
+  matching `CHECK_TRIGGER` changed since the last green run)
 
 ## Purpose and decisions
 
@@ -61,6 +97,11 @@ src/...
 - Each question has prepared answer options (2-4, recommended one first) plus the built-in "Other";
   single choice by default, multiSelect when several answers can apply together.
 - Record the answers in the change's `decisions.md` after each call.
+- Libraries: when a library could do something (retries, parsing, scheduling...), do not hand-write
+  it and do not pick one yourself. Collect the candidates with their usage and fit (weekly
+  downloads, latest version and its date, types, module format, the features the task needs) and
+  let the user choose through AskUserQuestion. Record the choice, with the numbers and the reason,
+  in the change's `decisions.md`.
 - Next steps: when a step ends and the next one is a command (`/spec-flow:apply <change>`,
   `/spec-flow:archive <change>`, a commit...), offer the likely next steps as options instead of
   telling the user to type them, and run the one they pick yourself (skills through the Skill tool).
@@ -84,8 +125,8 @@ src/...
      `spec-flow:ui-from-screenshots` skill.
    - No numbers in specs: tunable values (speeds, timings, limits, sizes) live in config and may be
      recorded in `decisions.md`, `design.md`, `tasks.md` and `ui.md`; specs say "the configured ...".
-2. Commit the planning artifacts on the main branch (with the user's approval), then implement on the
-   change's own branch with `/spec-flow:apply`, test first. Sequential by default; parallel groups
+2. Commit the planning artifacts on the change's own branch, then implement there with
+   `/spec-flow:apply`, test first. Sequential by default; parallel groups
    only if the user chooses it (the apply skill describes how).
 3. Hooks enforce the loop (settings in `.claude/flow.conf`): lint on each edit, full checks at the
    end, then the `spec-flow:change-verifier` subagent must return PASS before the work is done. Run it

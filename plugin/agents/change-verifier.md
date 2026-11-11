@@ -33,8 +33,11 @@ under "Assumed" or "Open questions" was never approved by the user: a requiremen
    - every design decision that has a visible footprint in the code
 3. For each claim find concrete evidence: file and line, or a command you ran.
    - Read the implementation, not just the file names.
-   - Run what can be run (the checks listed in `.claude/flow.conf`, the code against the
-     scenario's inputs) and quote the relevant output.
+   - Run what can be run (typecheck, lint, and the unit and integration test files related to the
+     change, the code against the scenario's inputs) and quote the relevant output. Never run e2e
+     tests (the levels `CLAUDE.md` reserves for the main agent, or a command such as `npm test`
+     that includes them): judge e2e tests by reading them, and list the e2e files the main agent
+     must run before the change counts as done.
    - Look for stubs, TODOs, hardcoded expected values, swallowed errors, dead
      code, leftover debug output and tests that cannot fail.
 4. Check for scope problems in both directions:
@@ -50,6 +53,14 @@ under "Assumed" or "Open questions" was never approved by the user: a requiremen
 7. Edge cases: for each requirement, name the obvious boundary inputs (empty,
    single element, max constraints, carry/overflow, null) and say whether they
    are covered by code or tests.
+8. Duplication: look for the same logic written more than once, across apps, across packages and
+   inside one module: classes or functions doing the same job, copied constants and enums (they
+   drift apart), repeated bootstrap, shutdown, config-parsing, logging, connection or health
+   wiring. Compare files with similar names or roles between apps or modules (e.g. `diff` the two
+   versions). Each duplicate is a gap: name both locations and where the shared version belongs
+   (the shared package or module `CLAUDE.md` names for it), with the hooks or params each user
+   needs to add its own part. Near-identical copies that differ only by accident count as
+   duplicates too.
 
 ## Report
 
