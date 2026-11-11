@@ -14,6 +14,11 @@ Archive change `$ARGUMENTS`. With no name: use the only active change, or ask
 2. **Ready?** Stop and say what is missing unless all of these hold:
    - every task is done: in `openspec list --json` the change has `completedTasks` equal to
      `totalTasks`;
+   - `brief.md` is the brief the user approved (its `shasum -a 256` equals the `sha256:` line of
+     `.decisions-approved`); if it changed, show it and offer "Approve the brief" again, then rerun
+     the verifier;
+   - the main branch is merged in: `git merge-base --is-ancestor <MAIN_BRANCH> HEAD`. If not, step 3
+     of "Checks" starts over from its merge;
    - step 3 of "Checks" in CLAUDE.md is done on the current commit: the first line of
      `openspec/changes/<name>/.verdict` is `PASS`, its `commit:` line is `git rev-parse HEAD`, and
      `git status --porcelain` shows nothing outside `openspec/`. If not, run step 3 now and fix

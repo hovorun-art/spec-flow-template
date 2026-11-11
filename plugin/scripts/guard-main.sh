@@ -12,8 +12,13 @@ MAIN_BRANCH=main
 # shellcheck disable=SC1091
 [ -f "${CLAUDE_PROJECT_DIR:-.}/.claude/flow.conf" ] && source "${CLAUDE_PROJECT_DIR:-.}/.claude/flow.conf"
 export MAIN_BRANCH
+# Fails closed: if the check itself breaks (python3 missing, an unexpected input), the call is denied
+# instead of passing unchecked.
+failed() {
+  printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Blocked: the spec-flow guard-main hook could not run its check (see the hook error output), so the call is denied instead of passing unchecked. Tell the user."}}'
+}
 input=$(cat)
-INPUT="$input" python3 - <<'PY'
+INPUT="$input" python3 - <<'PY' || failed
 import json, os, re, shlex, subprocess, sys
 
 d = json.loads(os.environ.get('INPUT') or '{}')

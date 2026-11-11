@@ -63,8 +63,6 @@ or match `LANGUAGE_IGNORE` in `.claude/flow.conf`.
 
 Each step is a skill of the `spec-flow` plugin; the skill holds the details.
 
-0. `spec-flow:roadmap`, once, while `docs/roadmap/` still has its TODO: turns `docs/concept.md` into
-   milestones and an ordered list of changes. Take each new change from it.
 1. `spec-flow:start` before the first edit of any work (`/spec-flow:explore` may come first to
    clarify). Nothing is changed on the main branch (`MAIN_BRANCH` in `.claude/flow.conf`): not
    code, not docs, not these instructions; a hook denies it.
@@ -89,6 +87,9 @@ Each step is a skill of the `spec-flow` plugin; the skill holds the details.
    brief" list, then `/spec-flow:archive`.
 5. `spec-flow:finish`: push or open a PR; merge only when the user picks it and approves the prompt.
 
+Optional: `spec-flow:roadmap` keeps an ordered list of changes in `docs/roadmap/`. When the project
+has one, a new change takes its name from it; the flow works the same without it.
+
 ## Git
 
 - Off the main branch commits and pushes of the branch need no approval: the main agent and
@@ -98,6 +99,8 @@ Each step is a skill of the `spec-flow` plugin; the skill holds the details.
 - One commit per task group, made when step 2 of "Checks" is done for it. Groups are never folded
   into one commit or split across commits. Only a parallel group differs: its subagent commits
   before the review, and what the review asks for is one follow-up commit (see the apply skill).
+- The main branch comes into a work branch without approval (`git merge <MAIN_BRANCH>`, see step 3
+  of "Checks"): the branch is brought up to date before its final checks, never after them.
 - Merging into the main branch only with the user's explicit approval, through `spec-flow:finish`:
   the user picks "Merge", then approves the git prompt. An approval covers that one command; "go
   ahead" for other work is not an approval to merge.
@@ -133,8 +136,13 @@ of a check whose inputs did not change, so rerunning one is cheap.
    - `npm run check` (typecheck, lint, unit tests);
    - the `spec-flow:test-case-reviewer` subagent (Sonnet, its default) in the foreground on the test
      files the group wrote or changed.
-3. End of a change, before `/spec-flow:archive`. The reviews come first and the slow checks last, so
-   the slow checks run once, on the final code:
+3. End of a change, before `/spec-flow:archive`. The main branch is merged in first, then the
+   reviews, and the slow checks last, so the slow checks run once, on the code that will be merged:
+   - bring the branch up to date: `git merge <MAIN_BRANCH>` in the change's worktree (skip it when
+     `git merge-base --is-ancestor <MAIN_BRANCH> HEAD` holds). Resolve conflicts on the branch and
+     commit; a conflict about behaviour or in `openspec/specs/` is the user's call. If the merge
+     changed a main spec this change modifies, copy the new requirement text into the delta's
+     MODIFIED block before going on;
    - in one message (both only read): the `spec-flow:test-case-reviewer` subagent on Opus
      (`model: "opus"` on the Agent call), one call per test area the branch touched
      (`git diff --name-only <MAIN_BRANCH>...HEAD`), each over its whole area, and the
@@ -145,12 +153,15 @@ of a check whose inputs did not change, so rerunning one is cheap.
    - then `npm run check:full` (adds integration tests) and `npm run test:e2e`. If one fails: fix
      it, commit, rerun what failed, and call the verifier once more.
 
-   A hook denies the archive without a PASS on the current commit, or with uncommitted changes
-   outside `openspec/`.
+   A hook denies the archive when the brief changed after the approval, when the main branch has
+   commits the branch lacks, without a PASS on the current commit, or with uncommitted changes
+   outside `openspec/`. The verdict counts for the commit the verifier started on, so do not commit
+   while it runs.
 
-Small work (a `fix/` or `docs/` branch), before `spec-flow:finish`, is lighter. A fix: `npm run check`, the Sonnet test review of
+Small work (a `fix/` or `docs/` branch), before `spec-flow:finish`, is lighter: merge the main branch
+in first (`git merge <MAIN_BRANCH>`), then a fix runs `npm run check`, the Sonnet test review of
 the test files it changed, and the e2e of the workspaces it touched
-(`npm run test:e2e -- --filter=<workspace>`). A docs-only branch: nothing.
+(`npm run test:e2e -- --filter=<workspace>`). A docs-only branch: the merge only.
 
 ## Asking
 

@@ -1,26 +1,26 @@
 #!/bin/bash
 # Tests for gate-files.sh: specs and tasks are blocked until the brief is approved (and again
 # after brief.md changes), state files are never written by an agent, a commit message may name them,
-# and `openspec archive` needs the verifier's PASS on the current commit.
+# `openspec archive` needs the approved brief, the main branch merged in and the verifier's PASS on the
+# current commit, and a write to .claude/flow.conf asks the user.
 # Run: bash plugin/scripts/tests/gate-files.test.sh
 set -u
 HOOK="$(cd "$(dirname "$0")/.." && pwd)/gate-files.sh"
 failures=0
 
-# A project on a change branch with change "demo" (brief approved), "draft" (not approved) and "old"
-# (older schema: decisions.md approved).
+# A project on a change branch with change "demo" (brief approved), "draft" (not approved) and "nohash"
+# (a marker without the brief's hash).
 make_project() {
   local dir
   dir=$(mktemp -d)
-  mkdir -p "$dir/openspec/changes/demo" "$dir/openspec/changes/draft" "$dir/openspec/changes/old" "$dir/src"
+  mkdir -p "$dir/openspec/changes/demo" "$dir/openspec/changes/draft" "$dir/openspec/changes/nohash" "$dir/src" "$dir/.claude"
   echo "Goal: x" >"$dir/openspec/changes/demo/brief.md"
   echo "- [ ] open" >"$dir/openspec/changes/draft/brief.md"
-  echo "- [x] decided" >"$dir/openspec/changes/old/decisions.md"
-  local c
-  for c in demo/brief.md old/decisions.md; do
-    printf 'approved: now\nsha256: %s\n' "$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$dir/openspec/changes/$c")" \
-      >"$dir/openspec/changes/${c%%/*}/.decisions-approved"
-  done
+  echo "Goal: y" >"$dir/openspec/changes/nohash/brief.md"
+  echo "approved: now" >"$dir/openspec/changes/nohash/.decisions-approved"
+  echo "MAIN_BRANCH=main" >"$dir/.claude/flow.conf"
+  printf 'approved: now\nsha256: %s\n' "$(python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$dir/openspec/changes/demo/brief.md")" \
+    >"$dir/openspec/changes/demo/.decisions-approved"
   printf 'openspec/changes/**/.verdict\n' >"$dir/.gitignore"
   echo "x" >"$dir/src/a.ts"
   git -C "$dir" init -q -b demo
@@ -34,7 +34,7 @@ verdict() {
   printf '%s\ncommit: %s\n' "$2" "${3:-$(git -C "$1" rev-parse HEAD)}" >"$1/openspec/changes/demo/.verdict"
 }
 
-# run_case <name> <tool> <file path or command> <expected: deny|none> [setup function]
+# run_case <name> <tool> <file path or command> <expected: deny|ask|none> [setup function]
 run_case() {
   local name="$1" tool="$2" arg="$3" expected="$4" setup="${5:-}"
   local dir actual
@@ -62,6 +62,14 @@ partial_here() { verdict "$1" PARTIAL; }
 pass_on_older_commit() { verdict "$1" PASS 0000000000000000000000000000000000000000; }
 pass_then_dirty_code() { verdict "$1" PASS; echo "y" >"$1/src/a.ts"; }
 pass_then_synced_specs() { verdict "$1" PASS; mkdir -p "$1/openspec/specs/x"; echo "s" >"$1/openspec/specs/x/spec.md"; }
+pass_then_brief_edited() { verdict "$1" PASS; echo "- one more thing" >>"$1/openspec/changes/demo/brief.md"; }
+# The main branch exists and is an ancestor of the change branch / has a commit the change branch lacks.
+main_merged() { git -C "$1" branch -q main; verdict "$1" PASS; }
+main_ahead() {
+  git -C "$1" branch -q main; git -C "$1" switch -q main
+  git -C "$1" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "other work"
+  git -C "$1" switch -q demo; verdict "$1" PASS
+}
 brief_edited() { echo "- one more thing" >>"$1/openspec/changes/demo/brief.md"; }
 log_appended() { echo "- 2026-01-01 x - why: y; by: user" >>"$1/openspec/changes/demo/decisions.md"; }
 
@@ -71,7 +79,7 @@ run_case "specs are blocked again after brief.md changed" Write '__DIR__/openspe
 run_case "appending to the decision log keeps the approval" Write '__DIR__/openspec/changes/demo/specs/a/spec.md' none log_appended
 run_case "the brief itself may be written" Edit '__DIR__/openspec/changes/draft/brief.md' none
 run_case "the decision log may be written before approval" Edit '__DIR__/openspec/changes/draft/decisions.md' none
-run_case "a change of the older schema is approved by its decisions.md" Edit '__DIR__/openspec/changes/old/tasks.md' none
+run_case "a marker without the brief's hash approves nothing" Edit '__DIR__/openspec/changes/nohash/tasks.md' deny
 run_case "the approval marker is never written by an agent" Write '__DIR__/openspec/changes/draft/.decisions-approved' deny
 run_case "the verdict is never written through Bash" Bash 'echo PASS > openspec/changes/demo/.verdict' deny
 run_case "reading the verdict is allowed" Bash 'cat openspec/changes/demo/.verdict' none
@@ -84,6 +92,9 @@ run_case "a write elsewhere after cd is left alone" Bash 'cd src && echo x > spe
 run_case "a project agent named change-verifier is never written" Write '__DIR__/.claude/agents/change-verifier.md' deny
 run_case "a project agent named change-verifier is never written through Bash" Bash 'cp x.md .claude/agents/change-verifier.md' deny
 run_case "another project agent may be written" Write '__DIR__/.claude/agents/helper.md' none
+run_case "editing flow.conf asks the user" Edit '__DIR__/.claude/flow.conf' ask
+run_case "writing flow.conf through Bash asks the user" Bash 'echo MAIN_BRANCH=x >> .claude/flow.conf' ask
+run_case "reading flow.conf is left alone" Bash 'cat .claude/flow.conf' none
 
 run_case "a commit message naming a state file is allowed" Bash "git commit -m 'chore: ignore .verdict
 
@@ -96,6 +107,9 @@ run_case "a write after the commit message is still checked" Bash "git commit -m
 run_case "archive without a verdict is blocked" Bash 'openspec archive demo' deny
 run_case "archive after PARTIAL is blocked" Bash 'openspec archive demo -y' deny partial_here
 run_case "archive after PASS on the current commit is allowed" Bash 'openspec archive "demo" -y' none pass_here
+run_case "archive after the brief changed is blocked, even with a PASS" Bash 'openspec archive demo' deny pass_then_brief_edited
+run_case "archive with the main branch merged in is allowed" Bash 'openspec archive demo' none main_merged
+run_case "archive while the main branch is ahead is blocked" Bash 'openspec archive demo' deny main_ahead
 run_case "archive after PASS on an older commit is blocked" Bash 'openspec archive demo' deny pass_on_older_commit
 run_case "archive with uncommitted code after PASS is blocked" Bash 'openspec archive demo' deny pass_then_dirty_code
 run_case "archive with synced main specs uncommitted is allowed" Bash 'openspec archive demo' none pass_then_synced_specs
@@ -105,5 +119,14 @@ run_case "moving a change into the archive after PASS is allowed" Bash 'mv "open
 run_case "moving a source file is left alone" Bash 'mv src/a.ts src/b.ts' none
 run_case "archive of an unknown change is left to the CLI" Bash 'openspec archive nope' none
 run_case "openspec status is left alone" Bash 'openspec status --change demo --json' none
+
+# A check that cannot run denies the call instead of letting it through.
+broken=$(printf 'not json' | bash "$HOOK" 2>/dev/null)
+if printf '%s' "$broken" | grep -q '"permissionDecision": "deny"'; then
+  echo "ok   a hook input that cannot be read is denied"
+else
+  echo "FAIL a hook input that cannot be read is denied: got '$broken'"
+  failures=$((failures + 1))
+fi
 
 [ "$failures" -eq 0 ] && echo "all passed" || { echo "$failures failed"; exit 1; }

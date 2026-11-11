@@ -1,22 +1,34 @@
 #!/bin/bash
 # PreToolUse hook (Write|Edit|MultiEdit|NotebookEdit|Bash): guards the files the flow relies on.
-# - specs/, tasks.md (and design.md, where a change has one) are blocked until the user has approved its
-#   brief (openspec/changes/<name>/.decisions-approved, which only approve.sh creates). The marker holds
-#   the sha256 of brief.md at approval, so any later edit of brief.md needs a new approval. A change of
-#   the older schema has decisions.md in the brief's place.
-# - The state files are never written by an agent, only by the hooks: .decisions-approved (approve.sh)
-#   and .verdict (verifier-hooks.sh).
+# - specs/ and tasks.md are blocked until the user has approved the change's brief
+#   (openspec/changes/<name>/.decisions-approved, which only approve.sh creates). The marker holds the
+#   sha256 of brief.md at approval, so any later edit of brief.md needs a new approval.
+# - The state files are never written by an agent, only by the hooks: .decisions-approved (approve.sh,
+#   which also removes it when the brief is edited) and .verdict (verifier-hooks.sh).
 # - No agent writes an agent definition named change-verifier (.claude/agents/): the verdict hook would
 #   record its PASS as the verifier's.
-# - `openspec archive <name>` runs only after the verifier's PASS on the current commit: .verdict starts
-#   with PASS, its `commit:` is HEAD, and nothing outside openspec/ is uncommitted.
+# - `openspec archive <name>` runs only when the brief is still the one the user approved, the main
+#   branch (MAIN_BRANCH in flow.conf) is merged into the change branch, and the verifier gave PASS on
+#   the current commit: .verdict starts with PASS, its `commit:` is HEAD, and nothing outside openspec/
+#   is uncommitted.
+# - .claude/flow.conf configures these hooks (the main branch, test first, English only), so a write to
+#   it asks the user.
 # Bash commands are checked by their text: one that names a guarded path and writes (redirect, tee, cp,
 # mv, touch, rm, sed -i, an interpreter...) is denied, also when a `cd` earlier in the command makes the
 # path relative (`cd openspec/changes/<name> && echo x > tasks.md`). Reading those files stays allowed. Literal commit
 # messages (-m '...', -m "..." without $ or a backtick, "$(cat <<'EOF' ... EOF)") are not part of that
 # text: a message may name a guarded file and hold a ">" (the Co-Authored-By trailer).
+MAIN_BRANCH=main
+# shellcheck disable=SC1091
+[ -f "${CLAUDE_PROJECT_DIR:-.}/.claude/flow.conf" ] && source "${CLAUDE_PROJECT_DIR:-.}/.claude/flow.conf"
+export MAIN_BRANCH
+# Fails closed: if the check itself breaks (python3 missing, an unexpected input), the call is denied
+# instead of passing unchecked.
+failed() {
+  printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Blocked: the spec-flow gate-files hook could not run its check (see the hook error output), so the call is denied instead of passing unchecked. Tell the user."}}'
+}
 input=$(cat)
-INPUT="$input" python3 - <<'PY'
+INPUT="$input" python3 - <<'PY' || failed
 import hashlib, json, os, re, subprocess, sys
 
 d = json.loads(os.environ.get('INPUT') or '{}')
@@ -26,35 +38,35 @@ cwd = d.get('cwd') or os.environ.get('CLAUDE_PROJECT_DIR') or os.getcwd()
 
 STATE = re.compile(r'(^|[/\s\'"])\.(decisions-approved|verdict)\b')
 VERIFIER_AGENT = re.compile(r'\.claude/agents/[^/\s\'"]*change-verifier[^/\s\'"]*\.md\b')
-GATED = re.compile(r'((?:[^\s\'"]*/)?)openspec/changes/([^/\s\'"]+)/(specs/|design\.md|tasks\.md)')
+GATED = re.compile(r'((?:[^\s\'"]*/)?)openspec/changes/([^/\s\'"]+)/(specs/|tasks\.md)')
+FLOW_CONF = re.compile(r'(^|[/\s\'"])\.claude/flow\.conf\b')
 WRITES = re.compile(r'>|\b(tee|cp|mv|touch|rm|ln|truncate|dd|install|perl|python3?|node|ruby)\b|\bsed\s+(-[a-zA-Z]*i|--in-place)')
 
 
-def deny(reason):
+def decide(decision, reason):
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
-        "permissionDecision": "deny",
+        "permissionDecision": decision,
         "permissionDecisionReason": reason,
     }}))
     sys.exit(0)
 
 
+def deny(reason):
+    decide("deny", reason)
+
+
 def approved(prefix, name):
+    """The marker of this change holds the sha256 of its brief.md as it is now."""
     root = prefix if os.path.isabs(prefix) else os.path.join(cwd, prefix)
     folder = os.path.join(root, 'openspec', 'changes', name)
     try:
         marker = open(os.path.join(folder, '.decisions-approved'), encoding='utf-8').read()
+        brief = open(os.path.join(folder, 'brief.md'), 'rb').read()
     except OSError:
         return False
     m = re.search(r'^sha256: ([0-9a-f]{64})$', marker, re.M)
-    if not m:
-        return True  # marker written before approvals recorded a hash
-    for doc in ('brief.md', 'decisions.md'):
-        try:
-            return hashlib.sha256(open(os.path.join(folder, doc), 'rb').read()).hexdigest() == m.group(1)
-        except OSError:
-            continue
-    return False
+    return bool(m) and hashlib.sha256(brief).hexdigest() == m.group(1)
 
 
 def gate_reason(name):
@@ -74,7 +86,9 @@ STATE_REASON = ("Blocked: this is a state file owned by the spec-flow hooks (.de
                 "Agents never write, move or delete it.")
 AGENT_REASON = ("Blocked: the change-verifier agent comes from the spec-flow plugin. A project agent of that "
                 "name would have its verdict recorded as the verifier's, so agents never write one.")
-GATED_WORD = re.compile(r'[^\s\'"<>|;&()]*(?:specs/[^\s\'"<>|;&()]*|design\.md|tasks\.md)')
+CONF_REASON = ("Project rule: .claude/flow.conf configures the spec-flow hooks (the main branch, test first, "
+               "English only), so changing it needs the user's approval.")
+GATED_WORD = re.compile(r'[^\s\'"<>|;&()]*(?:specs/[^\s\'"<>|;&()]*|tasks\.md)')
 
 
 def after_cd(cmd):
@@ -121,6 +135,28 @@ def archive_block(cmd):
         return None  # nothing is archived here, or no such change: the command reports it
     how = (f" Run step 3 of \"Checks\" in CLAUDE.md and the spec-flow:change-verifier subagent on '{name}' "
            "until it returns PASS on the current commit, then archive.")
+
+    def git(*args):
+        try:
+            return subprocess.run(['git', '-C', root, *args], capture_output=True, text=True, timeout=5)
+        except Exception:
+            return None
+
+    def git_out(*args):
+        out = git(*args)
+        return out.stdout if out is not None and out.returncode == 0 else None
+
+    if not approved(root, name):
+        return (f"Blocked: brief.md of '{name}' is not the brief the user approved (it changed after the "
+                "approval, or was never approved), so the change may not be archived. Show the user the brief "
+                "as it is now and offer \"Approve the brief\" again; then the verifier checks the code against "
+                "it.")
+    main = os.environ.get('MAIN_BRANCH') or 'main'
+    behind = git('merge-base', '--is-ancestor', main, 'HEAD')
+    if git_out('rev-parse', '--verify', '-q', 'refs/heads/' + main) and behind is not None and behind.returncode == 1:
+        return (f"Blocked: the main branch ({main}) has commits that are not in this branch, so '{name}' was "
+                f"verified on an outdated base. Merge it in first (`git merge {main}`), then run step 3 of "
+                "\"Checks\" in CLAUDE.md again.")
     try:
         lines = open(os.path.join(root, 'openspec', 'changes', name, '.verdict'), encoding='utf-8').read().splitlines()
     except OSError:
@@ -128,19 +164,12 @@ def archive_block(cmd):
     if not lines or lines[0].strip() != 'PASS':
         return f"Blocked: the last verifier verdict for '{name}' is {lines[0].strip() if lines else 'empty'}, not PASS." + how
 
-    def git(*args):
-        try:
-            out = subprocess.run(['git', '-C', root, *args], capture_output=True, text=True, timeout=5)
-        except Exception:
-            return None
-        return out.stdout if out.returncode == 0 else None
-
-    head = (git('rev-parse', 'HEAD') or '').strip()
+    head = (git_out('rev-parse', 'HEAD') or '').strip()
     commit = next((l.split(':', 1)[1].strip() for l in lines[1:] if l.startswith('commit:')), '')
     if head and commit and head != commit:
         return (f"Blocked: the verifier's PASS for '{name}' was given on commit {commit[:10]}, but HEAD is "
                 f"{head[:10]}: the code changed after it." + how)
-    dirty = [l[3:] for l in (git('status', '--porcelain') or '').splitlines()
+    dirty = [l[3:] for l in (git_out('status', '--porcelain') or '').splitlines()
              if not l[3:].strip('"').startswith('openspec/')]
     if head and dirty:
         return (f"Blocked: uncommitted changes outside openspec/ ({', '.join(dirty[:5])}) were not part of the "
@@ -160,6 +189,8 @@ if tool == 'Bash':
         deny(STATE_REASON)
     if VERIFIER_AGENT.search(cmd):
         deny(AGENT_REASON)
+    if FLOW_CONF.search(cmd):
+        decide("ask", CONF_REASON)
     for prefix, name, _ in GATED.findall(cmd) + [g for p in after_cd(cmd) for g in GATED.findall(p)]:
         if name != 'archive' and not approved(prefix, name):
             deny(gate_reason(name))
@@ -172,6 +203,8 @@ if STATE.search('/' + os.path.basename(path)):
     deny(STATE_REASON)
 if VERIFIER_AGENT.search(path):
     deny(AGENT_REASON)
+if FLOW_CONF.search(path):
+    decide("ask", CONF_REASON)
 m = GATED.search(path)
 if m and m.group(2) != 'archive' and not approved(m.group(1), m.group(2)):
     deny(gate_reason(m.group(2)))

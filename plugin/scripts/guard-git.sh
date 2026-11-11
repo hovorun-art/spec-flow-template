@@ -3,7 +3,8 @@
 # however they are spelled (git -C <dir> ..., `cd <dir> && git ...`, chained commands).
 #   - commit / cherry-pick on the main branch (MAIN_BRANCH in flow.conf): denied, the main branch only
 #     receives merges. On any other branch: allowed without asking, for the main agent and subagents.
-#     `commit --amend` asks (it rewrites a commit that may already be reported or pushed).
+#     `commit --amend` asks (it rewrites a commit that may already be reported or pushed), and so does
+#     `--no-verify` on a commit or a push (it skips the project's git hooks).
 #   - push of a change or fix branch: allowed. A push that targets the main branch, deletes, forces or
 #     pushes everything (--all, --mirror, --tags): the user is asked.
 #     "Allowed" covers the whole Bash command, so it is given only when every part of the command is a
@@ -12,10 +13,14 @@
 #     quoted heredoc, "$(cat <<'"'"'EOF'"'"' ... EOF)", is fine). Anything else chained to the commit
 #     (`curl ... | sh && git commit`) leaves the decision to the normal permission rules.
 #   - merge, pull, rebase, reset, revert, tag, update-ref, gh pr merge: the user is asked. Merging
-#     always needs the user's explicit approval.
+#     into the main branch always needs the user's explicit approval.
+#     The one merge that is allowed unasked is the opposite direction: `git merge <MAIN_BRANCH>` on a
+#     work branch, which brings the branch up to date before its final checks.
 #   - Commands that throw work away (branch -D, worktree remove --force, clean, stash drop/clear): asked.
 # The branch is the one the command will run on: a `cd` or `git switch -c` / `checkout -b` earlier in the
 # same command counts. Asking too often is harmless; committing on the main branch or merging unasked is not.
+# Fails closed: if the check itself breaks (python3 missing, an unexpected input), the call is put to the user
+# instead of passing unchecked.
 MAIN_BRANCH=main
 # shellcheck disable=SC1091
 [ -f "${CLAUDE_PROJECT_DIR:-.}/.claude/flow.conf" ] && source "${CLAUDE_PROJECT_DIR:-.}/.claude/flow.conf"
@@ -94,7 +99,7 @@ if cur: segments.append(cur)
 
 asks, allowed = [], False
 plain_git_only = True  # every segment is a cd or a harmless git command: the only case that is auto-allowed
-SAFE_SUBS = {"add", "commit", "cherry-pick", "push", "status", "diff", "log", "show", "rev-parse"}
+SAFE_SUBS = {"add", "commit", "cherry-pick", "push", "merge", "merge-base", "status", "diff", "log", "show", "rev-parse"}
 
 def writes_or_substitutes(seg):
     for j, t in enumerate(seg):
@@ -190,6 +195,8 @@ for seg in segments:
             asks.append(sub)
         elif sub == "commit" and "--amend" in flags:
             asks.append("commit --amend")
+        elif sub == "commit" and any(f == "--no-verify" or re.match(r"-[a-zA-Z]*n", f) for f in flags):
+            asks.append("commit --no-verify")
         else:
             allowed = True
     elif sub == "push":
@@ -201,7 +208,9 @@ for seg in segments:
                       or (r.lstrip("+").split(":")[0] == "HEAD" and ":" not in r and branch == main) for r in refspecs)
         deletes = any(r.startswith(":") for r in refspecs)
         forced = any(r.startswith("+") for r in refspecs)
-        if (set(flags) & risky or any(f.startswith("--force") for f in flags) or to_main or deletes or forced
+        if "--no-verify" in flags:
+            asks.append("push --no-verify")
+        elif (set(flags) & risky or any(f.startswith("--force") for f in flags) or to_main or deletes or forced
                 or (not refspecs and branch in (main, None, "HEAD"))):
             asks.append("push to the main branch, forced or deleting")
         else:
@@ -211,6 +220,11 @@ for seg in segments:
             continue
         if sub == "rebase" and set(flags) & {"--abort", "--quit"}:
             continue
+        if sub == "merge" and plain == [main] and set(flags) <= {"--no-edit", "--no-ff", "--ff"}:
+            top, branch = branch_at(directory)
+            if branch not in (main, None, "HEAD"):
+                allowed = True  # the main branch into a work branch: nothing reaches the main branch
+                continue
         asks.append(sub)
     elif sub == "branch":
         if set(flags) & {"-D", "-f", "--force", "-M", "-C"} or ("--delete" in flags and "--force" in flags):
@@ -228,6 +242,6 @@ for seg in segments:
 if asks:
     decide("ask", "Project rule: " + ", ".join(sorted(set(asks))) + " needs the user'"'"'s approval (merges and history rewrites are never done unasked).")
 if allowed and plain_git_only:
-    decide("allow", "Project rule: commits and pushes of a branch other than the main branch need no approval.")
-' 2>/dev/null
+    decide("allow", "Project rule: commits and pushes of a branch other than the main branch, and merging the main branch into it, need no approval.")
+' 2>/dev/null || printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": "Project rule: the spec-flow guard-git hook could not check this command, so it needs the approval of the user."}}'
 exit 0

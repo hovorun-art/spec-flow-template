@@ -74,6 +74,13 @@ run_case "clean asks" reliability 'git clean -fd' ask
 run_case "stash drop asks" reliability 'git stash drop' ask
 run_case "merge --abort is left alone" reliability 'git merge --abort' none
 run_case "merge asks" reliability 'git merge fix/thing' ask
+run_case "merging the main branch into a work branch is allowed" reliability 'git merge main' allow
+run_case "merging the main branch with --no-edit is allowed" reliability 'git merge --no-edit main' allow
+run_case "merging into the main branch asks" main 'git merge reliability' ask
+run_case "a squash merge of the main branch asks" reliability 'git merge --squash main' ask
+run_case "commit --no-verify asks" reliability 'git commit --no-verify -m x' ask
+run_case "commit -n asks" reliability 'git commit -n -m x' ask
+run_case "push --no-verify asks" reliability 'git push --no-verify' ask
 run_case "reset asks" reliability 'git reset --hard HEAD~1' ask
 run_case "commit chained with a push of the branch is allowed" reliability 'git commit -m x && git push' allow
 run_case "commit chained with a merge asks" reliability 'git commit -m x && git merge other' ask
@@ -91,5 +98,14 @@ run_case "gh pr merge asks" reliability 'gh pr merge 12' ask
 run_case "commit outside a repo asks" reliability 'git commit -m x' ask "/"
 run_case "read-only git command is left alone" main 'git status && git log -1' none
 run_case "non-git command is left alone" main 'npm test' none
+
+# A check that cannot run does not let the call through unchecked.
+broken=$(printf 'not json' | bash "$HOOK" 2>/dev/null)
+if printf '%s' "$broken" | grep -q '"permissionDecision": "ask"'; then
+  echo "ok   a hook input that cannot be read gets 'ask'"
+else
+  echo "FAIL a hook input that cannot be read gets 'ask': got '$broken'"
+  failures=$((failures + 1))
+fi
 
 [ "$failures" -eq 0 ] && echo "all passed" || { echo "$failures failed"; exit 1; }

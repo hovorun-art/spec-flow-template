@@ -36,22 +36,6 @@ while IFS= read -r line; do
 done < gitignore.flow
 echo "updated .gitignore"
 
-# Files from the copy-everything version (v1) that the plugin now provides; left in place they run twice.
-legacy=()
-for f in .claude/hooks .claude/commands/opsx .claude/commands/specs-go.md .claude/commands/work-on.md \
-         .claude/agents/change-verifier.md .claude/agents/test-case-reviewer.md .claude/skills/openspec-propose .claude/skills/openspec-explore \
-         .claude/skills/openspec-apply-change .claude/skills/openspec-archive-change \
-         .claude/skills/openspec-sync-specs .claude/skills/openspec-update-change \
-         .claude/skills/roadmap .claude/skills/ui-from-screenshots; do
-  [ -e "$dest/$f" ] && legacy+=("$f")
-done
-if [ ${#legacy[@]} -gt 0 ]; then
-  echo
-  echo "note: these files from an older install or from 'openspec init' duplicate the plugin; remove them:"
-  printf '  %s\n' "${legacy[@]}"
-  echo "  and remove the \"hooks\" block from .claude/settings.json if it still points to .claude/hooks/."
-fi
-
 [ -d "$dest/.git" ] || echo "note: $dest is not a git repository yet (git init); the git rules and parallel worktrees need one."
 command -v openspec >/dev/null 2>&1 || echo "note: install the OpenSpec CLI: npm i -g @fission-ai/openspec"
 command -v claude >/dev/null 2>&1 || echo "note: install Claude Code: https://claude.com/claude-code"
@@ -62,4 +46,4 @@ echo "  claude plugin marketplace add hovorun-art/spec-flow-template   # or: $re
 echo "  claude plugin install spec-flow@spec-flow"
 echo
 echo "Next: commit the template on the main branch yourself (Claude never edits or commits on it), then fill the TODOs in CLAUDE.md, openspec/config.yaml, docs/concept.md and .github/workflows/checks.yml,"
-echo "set .claude/flow.conf, then ask Claude to run the spec-flow:roadmap skill."
+echo "set .claude/flow.conf, then tell Claude what to build (the spec-flow:start skill). A roadmap is optional: spec-flow:roadmap."

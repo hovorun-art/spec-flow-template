@@ -73,4 +73,13 @@ run_case "creating a branch is allowed" main Bash 'git switch -c fix/thing' none
 run_case "creating a worktree is allowed" main Bash 'git worktree add -b feat ../feat main' none
 run_case "running tests is allowed" main Bash 'npx vitest related --run src/a.ts' none
 
+# A check that cannot run does not let the call through unchecked.
+broken=$(printf 'not json' | bash "$HOOK" 2>/dev/null)
+if printf '%s' "$broken" | grep -q '"permissionDecision": "deny"'; then
+  echo "ok   a hook input that cannot be read gets 'deny'"
+else
+  echo "FAIL a hook input that cannot be read gets 'deny': got '$broken'"
+  failures=$((failures + 1))
+fi
+
 [ "$failures" -eq 0 ] && echo "all passed" || { echo "$failures failed"; exit 1; }

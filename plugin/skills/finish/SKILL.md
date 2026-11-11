@@ -17,10 +17,17 @@ Never merge any other way (`git pull`, `git push origin <branch>:<main>`, `gh pr
    - A change (`openspec/changes/archive/` holds it, or `openspec/changes/<branch>/` still exists): it was
      archived after `spec-flow:change-verifier` returned PASS. If not, say what is missing
      (`/spec-flow:apply`, the verifier, `/spec-flow:archive`) and stop.
+   - The branch holds everything the main branch has: `git merge-base --is-ancestor <MAIN_BRANCH>
+     <branch>`. If not, the main branch moved since the checks ran: merge it in on the branch
+     (`git merge <MAIN_BRANCH>`, no approval needed in this direction), resolve conflicts there and
+     commit (a conflict about behaviour or in `openspec/specs/` is the user's call), then run the
+     checks below again on the result. The merge in step 3 then joins nothing that was not tested
+     together, and nothing is rerun after it.
    - The checks are done for the branch's last commit ("Checks" in `CLAUDE.md`). A change: step 3 ran
      before the archive; rerun `npm run check:full` rather than guess (it replays from the Turborepo
-     cache when nothing changed). A fix or docs branch: the lighter set for small work described there.
-     Fix what fails before offering anything.
+     cache when nothing changed), and `npm run test:e2e` too when the main branch was just merged in.
+     A fix or docs branch: the lighter set for small work described there. Fix what fails before
+     offering anything.
    - Show the commits the branch adds: `git log --oneline <MAIN_BRANCH>..<branch>`.
 
 2. **Ask what to do** with AskUserQuestion (single choice, these options):
@@ -38,8 +45,8 @@ Never merge any other way (`git pull`, `git push origin <branch>:<main>`, `gh pr
      `docs/` branch lives in the main checkout itself: when it is on the branch being finished, run
      `git -C <main checkout> switch <MAIN_BRANCH>` first. On any other branch, stop and tell the user.
    - `git -C <main checkout> merge --no-ff <branch>`. The hook asks the user once more; if they decline,
-     stop. On a conflict, stop and show the conflicting files; abort (`git -C <main checkout> merge
-     --abort`) only if the user asks.
+     stop. The branch already holds the main branch (step 1), so a conflict means the main branch
+     moved in the meantime: abort (`git -C <main checkout> merge --abort`) and go back to step 1.
    - Do not push the main branch unless the user asks for it (the hook asks for that too).
 
 4. **Clean up** (after a merge, or when the user asks): offer it with AskUserQuestion.

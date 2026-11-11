@@ -19,12 +19,18 @@ otherwise ask which one.
 ## Traceability
 
 Each requirement in the delta specs must trace to a line under "Behaviour" in
-`openspec/changes/<name>/brief.md` (in a change of the older schema: under "Decided" in `decisions.md`). Report any requirement, numeric value or outcome with no
+`openspec/changes/<name>/brief.md`. Report any requirement, numeric value or outcome with no
 such line as an invented behaviour (a gap), even if the code implements it correctly. An item still
 under "To confirm" was never approved by the user: a requirement built on it is a gap too. The
 brief's "Technical" section is a claim as well: what it says is reused must be reused, what it lists
 as new must be what the code uses, and a library, module or pattern the code adds that the brief does
 not name is a gap unless `decisions.md` logs the deviation and the user's approval of it.
+
+The brief counts only as the user approved it: the `sha256:` line of
+`openspec/changes/<name>/.decisions-approved` must equal `shasum -a 256` of `brief.md`. If the marker
+is missing or the hashes differ, the brief was changed after the approval: that is a gap by itself
+("brief.md is not the approved brief"), the verdict cannot be PASS, and the user has to approve the
+brief again.
 
 ## Full check or re-check
 
@@ -41,6 +47,11 @@ evidence: the previous verdict, the commit it was given on (`commit: <sha>`) and
      (stubs, scope creep, tests that cannot fail, edge cases, duplication, size and reuse), and every claim whose
      code or test the diff touches is checked again;
   3. the tests related to the changed files (the related-tests command from `CLAUDE.md`).
+  Files that changed only because the main branch was merged in since then are not this change's
+  work: they are in `git diff --name-only <sha> HEAD` but not in
+  `git diff --name-only <MAIN_BRANCH>...HEAD` (`MAIN_BRANCH` from `.claude/flow.conf`). Do not review
+  them for steps 3 to 9 or report them as scope creep; only make sure the change's claims still hold
+  next to them (the related tests).
   Do not re-read or re-verify claims the diff does not touch. Say at the top of the report that this
   is a re-check against `<sha>` and list the files it covered.
 - **Full check** (the procedure below) otherwise: no `.verdict`, no `commit:` line, the commit was
@@ -131,3 +142,6 @@ Write one verdict word. For PARTIAL or FAIL, list every gap under `GAPS:`, one `
 enough to act on without reading your report (what is missing, in which file, what the spec requires):
 the caller will fix them, commit the fixes and call you again with a fresh context; that run
 re-checks only these gaps and the diff since this commit, so a gap you leave out is not looked at again. For PASS, leave `GAPS:` empty.
+
+The verdict is recorded for the commit that was HEAD when you started. A commit the caller makes
+while you run is not covered by it and needs another run.

@@ -4,13 +4,17 @@
 #   --prompt : UserPromptSubmit, the user typed /spec-flow:specs-go <name> (or /specs-go <name>)
 #   --answer : PostToolUse on AskUserQuestion, the user picked an option whose label starts with
 #              "Approve the brief" in a question that names the change
+# and removes it again when the approved brief is edited:
+#   --edited : PostToolUse on Write|Edit|MultiEdit of openspec/changes/<name>/brief.md whose content no
+#              longer matches the marker's hash. `openspec status` then shows the approval as missing
+#              instead of done. (An edit through Bash leaves the marker; gate-files.sh compares the hash
+#              anyway.)
 # The marker is created only when brief.md has no unchecked item ("- [ ]") left under "To confirm";
 # otherwise the agent is told what is still unresolved. It records the sha256 of brief.md, so
 # gate-files.sh treats a later edit of brief.md as unapproved.
 # The label is matched in English only. When a question names a change whose brief is ready and offers
 # no such option (a translated label), the agent is told to ask again instead of nothing happening.
-# A change written with the older schema has decisions.md instead of brief.md; it is used when there is
-# no brief.md, and the older label "Approve decisions" still counts.
+# decisions.md is the change's log and is never what gets approved.
 mode="$1"
 input=$(cat)
 MODE="$mode" INPUT="$input" python3 - <<'PY'
@@ -29,19 +33,18 @@ def say(text):
 
 def approve(name, source):
     folder = os.path.join(changes, name)
-    decisions = next((p for p in (os.path.join(folder, 'brief.md'), os.path.join(folder, 'decisions.md'))
-                      if os.path.isfile(p)), None)
-    if not decisions:
+    brief = os.path.join(folder, 'brief.md')
+    if not os.path.isfile(brief):
         return f"spec-flow: change '{name}' has no brief.md, so nothing was approved."
-    open_items = [l.strip() for l in open(decisions, encoding='utf-8') if re.match(r'\s*- \[ \]', l)]
+    open_items = [l.strip() for l in open(brief, encoding='utf-8') if re.match(r'\s*- \[ \]', l)]
     if open_items:
         listing = '\n'.join(open_items[:20])
         return (f"spec-flow: the brief of '{name}' was NOT approved: {len(open_items)} item(s) in "
-                f"{os.path.basename(decisions)} are still unchecked (To confirm):\n{listing}\n"
+                f"brief.md are still unchecked (To confirm):\n{listing}\n"
                 "Resolve them with the user (AskUserQuestion), write the answers into the brief and the "
                 "decision log, then offer approval again.")
     stamp = datetime.datetime.now().astimezone().isoformat(timespec='seconds')
-    digest = hashlib.sha256(open(decisions, 'rb').read()).hexdigest()
+    digest = hashlib.sha256(open(brief, 'rb').read()).hexdigest()
     with open(os.path.join(folder, '.decisions-approved'), 'w', encoding='utf-8') as f:
         f.write(f"approved: {stamp}\nsource: {source}\nsha256: {digest}\n")
     return (f"spec-flow: the user approved the brief of '{name}'. Specs and tasks may now be "
@@ -53,6 +56,24 @@ def active():
         return []
     return [n for n in os.listdir(changes) if n != 'archive' and os.path.isdir(os.path.join(changes, n))]
 
+
+if mode == '--edited':
+    path = (d.get('tool_input') or {}).get('file_path') or ''
+    if os.path.basename(path) != 'brief.md' or os.path.basename(os.path.dirname(os.path.dirname(path))) != 'changes':
+        sys.exit(0)
+    folder = os.path.dirname(path if os.path.isabs(path) else os.path.join(d.get('cwd') or root, path))
+    marker = os.path.join(folder, '.decisions-approved')
+    try:
+        recorded = open(marker, encoding='utf-8').read()
+        current = hashlib.sha256(open(os.path.join(folder, 'brief.md'), 'rb').read()).hexdigest()
+    except OSError:
+        sys.exit(0)
+    if current not in recorded:
+        os.remove(marker)
+        say(f"spec-flow: brief.md of '{os.path.basename(folder)}' changed after the user approved it, so the "
+            "approval was removed. Specs, tasks and the archive are blocked until the user approves the brief "
+            "again: show the brief as it is now and offer \"Approve the brief\".")
+    sys.exit(0)
 
 if mode == '--prompt':
     m = re.match(r'\s*/(?:spec-flow:)?specs-go\s+([A-Za-z0-9._-]+)', d.get('prompt', ''))
@@ -69,7 +90,7 @@ for src in (ti.get('answers'), resp if isinstance(resp, dict) else None,
             resp.get('answers') if isinstance(resp, dict) else None):
     if isinstance(src, dict):
         answers.update({k: v for k, v in src.items() if isinstance(v, str)})
-APPROVE = r'Approve (?:the )?(?:brief|decisions)'
+APPROVE = r'Approve the brief'
 picked = [q for q, a in answers.items() if re.match(APPROVE, a.strip(), re.I)]
 if not picked:
     text = resp if isinstance(resp, str) else json.dumps(resp or '', ensure_ascii=False)

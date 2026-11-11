@@ -18,7 +18,7 @@ run_case() {
   dir=$(mktemp -d)
   mkdir -p "$dir/openspec/changes/demo" "$dir/.claude"
   make_transcript "$content" >"$dir/transcript.jsonl"
-  python3 -c 'import json,sys; print(json.dumps({"agent_type":"change-verifier","agent_transcript_path":sys.argv[1],"stop_hook_active":True,"last_assistant_message":sys.argv[2]}))' \
+  python3 -c 'import json,sys; print(json.dumps({"agent_type":"spec-flow:change-verifier","agent_transcript_path":sys.argv[1],"stop_hook_active":True,"last_assistant_message":sys.argv[2]}))' \
     "$dir/transcript.jsonl" "$last" | CLAUDE_PROJECT_DIR="$dir" bash "$HOOK" stop >/dev/null
   local actual
   actual=$(head -1 "$dir/openspec/changes/demo/.verdict" 2>/dev/null || echo "<no verdict file>")
@@ -69,20 +69,22 @@ REPORT_TEXT=$(printf 'All good.\n\nCHANGE: demo\nVERDICT: PASS\nGAPS:\n')
 PARTIAL_TEXT=$(printf 'Gaps.\n\nCHANGE: demo\nVERDICT: PARTIAL\nGAPS:\n- a gap\n')
 
 run_handback "handback: records the verdict from the hand-back call of a verifier" \
-  "change-verifier" "$REPORT_TEXT" "PASS"
-run_handback "handback: records a PARTIAL verdict" "change-verifier" "$PARTIAL_TEXT" "PARTIAL"
+  "spec-flow:change-verifier" "$REPORT_TEXT" "PASS"
+run_handback "handback: records a PARTIAL verdict" "spec-flow:change-verifier" "$PARTIAL_TEXT" "PARTIAL"
 run_handback "handback: ignores the hand-back of another agent type" \
   "general-purpose" "$REPORT_TEXT" "<no verdict file>"
+run_handback "handback: ignores an agent whose type only ends like the verifier's" \
+  "my-change-verifier" "$REPORT_TEXT" "<no verdict file>"
 run_handback "handback: ignores a call without an agent type" "" "$REPORT_TEXT" "<no verdict file>"
 run_handback "handback: never blocks, even without a trailer" \
-  "change-verifier" "No trailer here." "<no verdict file>"
+  "spec-flow:change-verifier" "No trailer here." "<no verdict file>"
 
 # A background verifier hands its report back before it stops, so at SubagentStop there is no
 # final message and the transcript does not hold the report yet: stop must not block it.
 stop_dir=$(mktemp -d)
 mkdir -p "$stop_dir/openspec/changes/demo" "$stop_dir/.claude"
 make_transcript '[{"type":"text","text":"working"}]' >"$stop_dir/transcript.jsonl"
-stop_out=$(python3 -c 'import json,sys; print(json.dumps({"agent_type":"change-verifier","agent_transcript_path":sys.argv[1],"stop_hook_active":False}))' \
+stop_out=$(python3 -c 'import json,sys; print(json.dumps({"agent_type":"spec-flow:change-verifier","agent_transcript_path":sys.argv[1],"stop_hook_active":False}))' \
   "$stop_dir/transcript.jsonl" | CLAUDE_PROJECT_DIR="$stop_dir" bash "$HOOK" stop)
 if [ -z "$stop_out" ]; then
   echo "ok   stop: does not block a background run that already handed back"
@@ -99,7 +101,7 @@ mkdir -p "$git_dir/openspec/changes/demo" "$git_dir/.claude"
 git -C "$git_dir" init -q -b feat
 git -C "$git_dir" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
 git_head=$(git -C "$git_dir" rev-parse HEAD)
-python3 -c 'import json,sys; print(json.dumps({"agent_type":"change-verifier","stop_hook_active":True,"last_assistant_message":sys.argv[1]}))' \
+python3 -c 'import json,sys; print(json.dumps({"agent_type":"spec-flow:change-verifier","stop_hook_active":True,"last_assistant_message":sys.argv[1]}))' \
   "$PARTIAL_TEXT" | CLAUDE_PROJECT_DIR="$git_dir" bash "$HOOK" stop >/dev/null
 expected_verdict=$(printf 'PARTIAL\ncommit: %s\n- a gap' "$git_head")
 actual_verdict=$(cat "$git_dir/openspec/changes/demo/.verdict" 2>/dev/null)
@@ -107,6 +109,19 @@ if [ "$actual_verdict" = "$expected_verdict" ]; then
   echo "ok   stop: records the commit and the gaps in a git repository"
 else
   echo "FAIL stop: records the commit and the gaps in a git repository: got '$actual_verdict'"
+  failures=$((failures + 1))
+fi
+
+# A commit made while the verifier runs is not covered: the verdict keeps the commit the run started on.
+printf '{"agent_type":"spec-flow:change-verifier","agent_id":"a1"}' | CLAUDE_PROJECT_DIR="$git_dir" bash "$HOOK" start >/dev/null
+git -C "$git_dir" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "made while the verifier ran"
+python3 -c 'import json,sys; print(json.dumps({"agent_type":"spec-flow:change-verifier","agent_id":"a1","stop_hook_active":True,"last_assistant_message":sys.argv[1]}))' \
+  "$REPORT_TEXT" | CLAUDE_PROJECT_DIR="$git_dir" bash "$HOOK" stop >/dev/null
+actual_verdict=$(cat "$git_dir/openspec/changes/demo/.verdict" 2>/dev/null)
+if [ "$actual_verdict" = "$(printf 'PASS\ncommit: %s' "$git_head")" ]; then
+  echo "ok   stop: the verdict is recorded on the commit the verifier started on"
+else
+  echo "FAIL stop: the verdict is recorded on the commit the verifier started on: got '$actual_verdict'"
   failures=$((failures + 1))
 fi
 rm -rf "$git_dir"

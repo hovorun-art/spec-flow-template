@@ -7,14 +7,15 @@ set -u
 HOOK="$(cd "$(dirname "$0")/.." && pwd)/approve.sh"
 failures=0
 
-# A project with change "demo" (brief ready), "draft" (an item to confirm) and "old" (decisions.md only).
+# A project with change "demo" (brief ready), "draft" (an item to confirm) and "logonly" (a decision log
+# and no brief).
 make_project() {
   local dir
   dir=$(mktemp -d)
-  mkdir -p "$dir/openspec/changes/demo" "$dir/openspec/changes/draft" "$dir/openspec/changes/old"
+  mkdir -p "$dir/openspec/changes/demo" "$dir/openspec/changes/draft" "$dir/openspec/changes/logonly"
   printf '## Product\nGoal: x\n## To confirm\n' >"$dir/openspec/changes/demo/brief.md"
   printf '## To confirm\n- [ ] which limit?\n' >"$dir/openspec/changes/draft/brief.md"
-  echo "- [x] decided" >"$dir/openspec/changes/old/decisions.md"
+  echo "- 2026-01-01 x - why: y; by: user" >"$dir/openspec/changes/logonly/decisions.md"
   echo "$dir"
 }
 
@@ -40,15 +41,37 @@ answer() { # answer <question> <picked label>
 
 run_case "typed command approves a ready brief" --prompt '{"prompt":"/spec-flow:specs-go demo"}' demo approved
 run_case "typed command does not approve a brief with items to confirm" --prompt '{"prompt":"/spec-flow:specs-go draft"}' draft not
-run_case "typed command approves a change of the older schema" --prompt '{"prompt":"/specs-go old"}' old approved
+run_case "a decision log without a brief is never approved" --prompt '{"prompt":"/spec-flow:specs-go logonly"}' logonly not
 run_case "a prompt that only mentions the command approves nothing" --prompt '{"prompt":"please run /spec-flow:specs-go demo"}' demo not
 run_case "picking Approve the brief approves the named change" --answer "$(answer 'Approve the brief of `demo`?' 'Approve the brief')" demo approved
-run_case "the older label still approves" --answer "$(answer 'Approve the decisions of `demo`?' 'Approve decisions')" demo approved
+run_case "another approve label approves nothing" --answer "$(answer 'Approve the decisions of `demo`?' 'Approve decisions')" demo not
 run_case "picking Not yet approves nothing" --answer "$(answer 'Approve the brief of `demo`?' 'Not yet')" demo not
 run_case "approval for a question that names no change is ignored" --answer "$(answer 'Approve the brief?' 'Approve the brief')" demo not
 run_case "the option does not approve a brief with items to confirm" --answer "$(answer 'Approve the brief of `draft`?' 'Approve the brief')" draft not
 
 run_case "a translated label approves nothing" --answer "$(answer 'Затвердити бриф demo?' 'Затвердити бриф')" demo not # allow-non-english
+
+# edited_case <name> <file the tool wrote> <setup: keep|change> <expected: approved|not>: an approved brief
+# that is edited loses its marker.
+edited_case() {
+  local name="$1" file="$2" setup="$3" expected="$4" dir actual=not
+  dir=$(make_project)
+  printf '%s' '{"prompt":"/spec-flow:specs-go demo"}' | CLAUDE_PROJECT_DIR="$dir" bash "$HOOK" --prompt >/dev/null
+  [ "$setup" = change ] && echo "- one more thing" >>"$dir/openspec/changes/demo/brief.md"
+  python3 -c 'import json,sys; print(json.dumps({"tool_name":"Edit","tool_input":{"file_path":sys.argv[1]},"cwd":sys.argv[2]}))' \
+    "$dir/$file" "$dir" | CLAUDE_PROJECT_DIR="$dir" bash "$HOOK" --edited >/dev/null
+  [ -f "$dir/openspec/changes/demo/.decisions-approved" ] && actual=approved
+  if [ "$actual" = "$expected" ]; then
+    echo "ok   $name"
+  else
+    echo "FAIL $name: expected '$expected', got '$actual'"
+    failures=$((failures + 1))
+  fi
+  rm -rf "$dir"
+}
+edited_case "an edit that changes the approved brief removes the approval" openspec/changes/demo/brief.md change not
+edited_case "a write that leaves the brief as approved keeps the approval" openspec/changes/demo/brief.md keep approved
+edited_case "an edit of another file keeps the approval" openspec/changes/demo/decisions.md change approved
 
 # note_case <name> <question> <picked label> <expected: note|silent>: whether the agent is told to ask again.
 note_case() {

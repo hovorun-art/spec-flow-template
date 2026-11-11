@@ -39,7 +39,8 @@
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/check-language.sh\" --post" }
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/check-language.sh\" --post" },
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/approve.sh\" --edited" }
         ]
       },
       {
@@ -51,7 +52,7 @@
     ],
     "SubagentStart": [
       {
-        "matcher": ".*change-verifier$",
+        "matcher": "^spec-flow:change-verifier$",
         "hooks": [
           { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/verifier-hooks.sh\" start" }
         ]
@@ -59,7 +60,7 @@
     ],
     "SubagentStop": [
       {
-        "matcher": ".*change-verifier$",
+        "matcher": "^spec-flow:change-verifier$",
         "hooks": [
           { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/verifier-hooks.sh\" stop" }
         ]
